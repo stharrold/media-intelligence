@@ -1,0 +1,114 @@
+# Media Intelligence Pipeline Configuration
+
+# Processing Settings
+processing:
+  # Maximum audio duration in minutes (480 = 8 hours, GCP limit)
+  max_duration_minutes: 480
+
+  # Segment duration for situation classification (seconds)
+  segment_duration: 30
+
+  # Enable/disable components
+  enable_diarization: true
+  enable_situation_detection: true
+  enable_cost_estimation: true
+
+# Speech-to-Text Settings
+speech:
+  # Model selection: long, short, telephony, video
+  model: long
+
+  # Language configuration
+  language_codes:
+    - en-US
+
+  # Speaker diarization
+  diarization:
+    enabled: true
+    min_speaker_count: 2
+    max_speaker_count: 6
+
+  # Recognition features
+  features:
+    enable_automatic_punctuation: true
+    enable_word_time_offsets: true
+    enable_word_confidence: true
+    enable_spoken_punctuation: false
+    enable_spoken_emojis: false
+
+# Situation Classification Settings
+situation:
+  # Vertex AI AutoML endpoint
+  enabled: true
+
+  # Situation labels
+  labels:
+    - airplane
+    - car
+    - walking
+    - meeting
+    - office
+    - outdoor
+    - restaurant
+    - quiet
+
+  # Classification threshold
+  confidence_threshold: 0.5
+
+# Storage Settings
+storage:
+  # Output paths (relative to output bucket)
+  results_prefix: results/
+  transcripts_prefix: transcripts/
+
+  # File retention (days)
+  input_retention_days: 30
+  output_retention_days: 90
+
+# Output Formats
+output:
+  # Generate JSON output
+  json:
+    enabled: true
+    include_word_timings: true
+    include_confidence_scores: true
+
+  # Generate plain text transcript
+  txt:
+    enabled: true
+    include_speaker_labels: true
+    include_timestamps: true
+
+  # BigQuery export
+  bigquery:
+    enabled: false
+    dataset: media_intelligence
+    table: transcripts
+
+# Logging Settings
+logging:
+  level: INFO
+  structured: true
+  include_request_id: true
+
+# Cost Estimation Settings (USD)
+cost:
+  # Speech-to-Text V2 pricing (per 15 seconds)
+  speech_enhanced_per_15s: 0.009
+  speech_standard_per_15s: 0.006
+
+  # Vertex AI pricing (per 1000 predictions)
+  vertex_per_1000_predictions: 0.30
+
+  # Storage pricing (per GB per month)
+  storage_per_gb: 0.020
+
+# Supported Audio Formats
+supported_formats:
+  - wav
+  - mp3
+  - m4a
+  - flac
+  - opus
+  - ogg
+  - aac
