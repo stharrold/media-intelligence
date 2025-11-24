@@ -46,15 +46,32 @@ class Transcriber:
         model: Loaded faster-whisper model
     """
 
+    # Valid Whisper model sizes
+    VALID_MODELS = {
+        "tiny", "tiny.en", "base", "base.en", "small", "small.en",
+        "medium", "medium.en", "large-v2", "large-v3"
+    }
+
     def __init__(self, config: Optional[WhisperConfig] = None):
         """
         Initialize the transcriber.
 
         Args:
             config: WhisperConfig instance. Uses defaults if not provided.
+
+        Raises:
+            ValueError: If model_size is not a valid Whisper model
         """
         self.config = config or WhisperConfig()
         self.model = None
+
+        # Validate model name at initialization
+        if self.config.model_size not in self.VALID_MODELS:
+            raise ValueError(
+                f"Invalid Whisper model: '{self.config.model_size}'. "
+                f"Valid models: {', '.join(sorted(self.VALID_MODELS))}"
+            )
+
         self._load_model()
 
     def _load_model(self) -> None:

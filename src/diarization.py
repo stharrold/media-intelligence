@@ -75,7 +75,8 @@ class Diarizer:
         self.hf_token = hf_token or os.environ.get("HUGGINGFACE_TOKEN")
         self.pipeline = None
 
-        if not self.hf_token:
+        # Validate token is provided and non-empty
+        if not self.hf_token or not self.hf_token.strip():
             raise ValueError(
                 "HuggingFace token required for speaker diarization.\n"
                 "Solution:\n"

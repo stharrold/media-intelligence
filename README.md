@@ -248,6 +248,17 @@ See `config.example.yaml` for all available options including:
 - Output format preferences
 - Resource limits
 
+### Configuration Precedence
+
+Settings are applied in the following order (later sources override earlier ones):
+
+1. **Default values** - Built-in defaults in the code
+2. **config.yaml** - Advanced configuration file (if present)
+3. **Environment variables (.env)** - Loaded via python-dotenv
+4. **Command-line arguments** - Highest priority, always override other settings
+
+For example, if `DEFAULT_MODEL=base.en` is set in `.env` but you run `./run.sh audio.wav -m tiny.en`, the `tiny.en` model will be used.
+
 ## Troubleshooting
 
 ### "HuggingFace token required for speaker diarization"

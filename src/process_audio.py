@@ -33,6 +33,8 @@ from .utils import (
     load_audio,
     find_audio_files,
     validate_audio_file,
+    validate_memory_for_file,
+    sanitize_path,
     get_audio_duration,
     save_json_output,
     save_transcript_output,
@@ -80,6 +82,7 @@ class AudioProcessor:
         hf_token: Optional[str] = None,
         enable_diarization: bool = True,
         enable_situation: bool = True,
+        timeout: Optional[int] = None,
     ):
         """
         Initialize the audio processor.
@@ -92,11 +95,14 @@ class AudioProcessor:
             hf_token: HuggingFace token for pyannote (optional)
             enable_diarization: Enable speaker diarization
             enable_situation: Enable situation classification
+            timeout: Processing timeout in seconds (None for no limit)
         """
+        self.timeout = timeout
         self.device = device
         self.num_workers = num_workers
         self.hf_token = hf_token or os.environ.get("HUGGINGFACE_TOKEN")
         self.enable_diarization = enable_diarization
+        self.whisper_model = whisper_model
         self.enable_situation = enable_situation
 
         # Set thread limits
@@ -162,8 +168,9 @@ class AudioProcessor:
             FileNotFoundError: If audio file not found
             ValueError: If audio format not supported
         """
-        audio_path = Path(audio_path)
-        output_dir = Path(output_dir)
+        # Sanitize paths to prevent path traversal
+        audio_path = sanitize_path(audio_path)
+        output_dir = sanitize_path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         if not audio_path.exists():
@@ -175,8 +182,23 @@ class AudioProcessor:
                 f"Supported: {', '.join(SUPPORTED_FORMATS)}"
             )
 
+        # Validate memory requirements
+        mem_valid, mem_msg = validate_memory_for_file(audio_path, self.whisper_model)
+        if not mem_valid:
+            raise MemoryError(mem_msg)
+        if mem_msg:  # Warning message
+            print_warning(mem_msg)
+
         start_time = time.time()
         filename = audio_path.stem
+
+        # Helper function to check timeout
+        def check_timeout():
+            if self.timeout and (time.time() - start_time) > self.timeout:
+                raise TimeoutError(
+                    f"Processing timeout after {self.timeout}s. "
+                    f"Consider using a smaller model or shorter audio files."
+                )
 
         console.print(f"\nProcessing: [bold]{audio_path.name}[/bold]")
 
@@ -194,6 +216,7 @@ class AudioProcessor:
             audio, sr, language=language, beam_size=beam_size
         )
         console.print(f"  Found {len(transcript_segments)} segments")
+        check_timeout()
 
         # Step 2: Diarization (optional)
         speaker_segments = []
@@ -207,6 +230,7 @@ class AudioProcessor:
                 transcript_segments = assign_speakers(transcript_segments, speaker_segments)
                 num_speakers = len(set(s.speaker for s in speaker_segments))
                 console.print(f"  Found {num_speakers} speakers")
+                check_timeout()
             except Exception as e:
                 logger.error(f"Diarization failed: {e}")
                 print_warning(f"Diarization failed: {e}")
@@ -220,6 +244,7 @@ class AudioProcessor:
             try:
                 situation_segments, overall_situation = self.classifier.classify_audio(audio, sr)
                 console.print(f"  Overall situation: {overall_situation}")
+                check_timeout()
             except Exception as e:
                 logger.error(f"Situation classification failed: {e}")
                 print_warning(f"Situation classification failed: {e}")
@@ -404,6 +429,12 @@ Examples:
         "--log-file",
         help="Write logs to file"
     )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=None,
+        help="Processing timeout in seconds (default: no limit)"
+    )
 
     return parser.parse_args()
 
@@ -430,6 +461,7 @@ def main() -> int:
             hf_token=args.hf_token,
             enable_diarization=not args.no_diarization,
             enable_situation=not args.no_situation,
+            timeout=args.timeout,
         )
 
         input_path = Path(args.input)

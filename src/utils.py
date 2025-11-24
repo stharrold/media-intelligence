@@ -30,6 +30,99 @@ console = Console()
 # Supported audio formats
 SUPPORTED_FORMATS = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".opus"}
 
+# Memory thresholds (in bytes)
+MEMORY_WARNING_THRESHOLD = 4 * 1024 * 1024 * 1024  # 4GB
+MEMORY_ERROR_THRESHOLD = 8 * 1024 * 1024 * 1024    # 8GB
+
+
+def check_available_memory() -> int:
+    """
+    Check available system memory.
+
+    Returns:
+        Available memory in bytes
+    """
+    try:
+        import psutil
+        return psutil.virtual_memory().available
+    except ImportError:
+        # psutil not available, return a large value to skip check
+        return MEMORY_ERROR_THRESHOLD * 2
+
+
+def estimate_memory_requirement(file_size_bytes: int, model_size: str = "base.en") -> int:
+    """
+    Estimate memory requirement for processing an audio file.
+
+    Args:
+        file_size_bytes: Size of the audio file in bytes
+        model_size: Whisper model size
+
+    Returns:
+        Estimated memory requirement in bytes
+    """
+    # Base memory requirements per model (approximate)
+    model_memory = {
+        "tiny": 1 * 1024 * 1024 * 1024,      # 1GB
+        "tiny.en": 1 * 1024 * 1024 * 1024,
+        "base": 1.5 * 1024 * 1024 * 1024,    # 1.5GB
+        "base.en": 1.5 * 1024 * 1024 * 1024,
+        "small": 2 * 1024 * 1024 * 1024,     # 2GB
+        "small.en": 2 * 1024 * 1024 * 1024,
+        "medium": 5 * 1024 * 1024 * 1024,    # 5GB
+        "medium.en": 5 * 1024 * 1024 * 1024,
+        "large-v2": 10 * 1024 * 1024 * 1024, # 10GB
+        "large-v3": 10 * 1024 * 1024 * 1024,
+    }
+
+    base_model_mem = model_memory.get(model_size, 2 * 1024 * 1024 * 1024)
+
+    # Add diarization (~2GB) and AST (~1GB) overhead
+    pipeline_overhead = 3 * 1024 * 1024 * 1024
+
+    # Audio data overhead (rough estimate: 10x file size for processing)
+    audio_overhead = file_size_bytes * 10
+
+    return int(base_model_mem + pipeline_overhead + audio_overhead)
+
+
+def validate_memory_for_file(
+    file_path: Union[str, Path],
+    model_size: str = "base.en"
+) -> Tuple[bool, str]:
+    """
+    Validate that sufficient memory is available to process a file.
+
+    Args:
+        file_path: Path to audio file
+        model_size: Whisper model size to use
+
+    Returns:
+        Tuple of (is_valid, message)
+    """
+    file_path = Path(file_path)
+    if not file_path.exists():
+        return True, ""  # Let other validation handle missing files
+
+    file_size = file_path.stat().st_size
+    estimated_mem = estimate_memory_requirement(file_size, model_size)
+    available_mem = check_available_memory()
+
+    if estimated_mem > available_mem:
+        return False, (
+            f"Insufficient memory: estimated {estimated_mem / (1024**3):.1f}GB required, "
+            f"but only {available_mem / (1024**3):.1f}GB available. "
+            f"Try using a smaller model (e.g., tiny.en) or process shorter audio files."
+        )
+
+    if available_mem < MEMORY_WARNING_THRESHOLD:
+        return True, (
+            f"Warning: Low available memory ({available_mem / (1024**3):.1f}GB). "
+            f"Processing may be slow or fail for large files."
+        )
+
+    return True, ""
+
 
 def setup_logging(level: str = "INFO", log_file: Optional[str] = None) -> logging.Logger:
     """
