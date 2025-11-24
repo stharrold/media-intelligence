@@ -15,7 +15,7 @@ import sys
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Tuple, Union
 import json
 
 import numpy as np
@@ -78,7 +78,7 @@ def load_audio(
     file_path: Union[str, Path],
     target_sr: int = 16000,
     mono: bool = True
-) -> tuple[np.ndarray, int]:
+) -> Tuple[np.ndarray, int]:
     """
     Load and preprocess audio file.
 
