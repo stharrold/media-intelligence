@@ -1,167 +1,194 @@
 # Quick Start Guide
 
-Get the Media Intelligence Pipeline running in 5 minutes.
+Get started with Media Intelligence in 5 minutes.
 
 ## Prerequisites
 
-- Google Cloud account with billing enabled
-- `gcloud` CLI installed and authenticated
-- Python 3.11+
+- **Container Runtime**: Podman (recommended) or Docker
+- **Memory**: 4GB+ RAM available
+- **Disk**: 5GB+ free space for models
 
-## Step 1: Set Up GCP Project
-
-```bash
-# Set your project ID
-export PROJECT_ID="your-project-id"
-export REGION="us-central1"
-
-# Login and set project
-gcloud auth login
-gcloud config set project $PROJECT_ID
-
-# Enable required APIs
-gcloud services enable \
-    speech.googleapis.com \
-    storage.googleapis.com \
-    run.googleapis.com \
-    cloudbuild.googleapis.com \
-    pubsub.googleapis.com \
-    artifactregistry.googleapis.com
-```
-
-## Step 2: Deploy
+## Step 1: Clone and Build
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/media-intelligence-gcp.git
-cd media-intelligence-gcp
-
-# Run the deployment script
-./deploy.sh --project $PROJECT_ID --region $REGION
+git clone https://github.com/stharrold/media-intelligence.git
+cd media-intelligence
+./build.sh
 ```
 
-This will:
-1. Create Cloud Storage buckets for input/output
-2. Set up Pub/Sub topics for event-driven processing
-3. Build and deploy the Cloud Run service
-4. Configure IAM permissions
+Build takes 3-5 minutes on first run (downloads models).
 
-## Step 3: Process Your First Audio File
+## Step 2: Configure HuggingFace Token (Optional)
+
+Speaker diarization requires a HuggingFace token.
+
+### Get Your Token
+
+1. Create account: https://huggingface.co/join
+2. Accept pyannote terms: https://huggingface.co/pyannote/speaker-diarization-3.1
+3. Generate token: https://huggingface.co/settings/tokens (select "Read" access)
+
+### Add to Configuration
 
 ```bash
-# Upload an audio file
-gsutil cp your-audio.wav gs://$PROJECT_ID-media-input/
-
-# Wait a few seconds for processing...
-
-# Check the results
-gsutil ls gs://$PROJECT_ID-media-output/results/
-gsutil ls gs://$PROJECT_ID-media-output/transcripts/
+# Edit .env file
+echo "HUGGINGFACE_TOKEN=hf_your_token_here" >> .env
 ```
 
-## Step 4: View Results
+**Note**: Skip this step if you don't need speaker identification.
+
+## Step 3: Add Audio Files
+
+Place your audio files in the `data/input/` directory:
 
 ```bash
-# Download the JSON result
-gsutil cp gs://$PROJECT_ID-media-output/results/*.json ./
-
-# Or download the transcript
-gsutil cp gs://$PROJECT_ID-media-output/transcripts/*.txt ./
+cp ~/my_recording.wav data/input/
 ```
 
-## Using the API Directly
+Supported formats: WAV, MP3, M4A, FLAC, OGG, OPUS
+
+## Step 4: Process Audio
 
 ```bash
-# Get the service URL
-SERVICE_URL=$(gcloud run services describe media-processor \
-    --region $REGION --format 'value(status.url)')
-
-# Process a specific file
-curl -X POST "$SERVICE_URL/process" \
-    -H "Content-Type: application/json" \
-    -d '{
-        "gcs_uri": "gs://'"$PROJECT_ID"'-media-input/your-audio.wav"
-    }'
+./run.sh my_recording.wav
 ```
 
-## Example Response
-
-```json
-{
-    "status": "success",
-    "file_id": "20231201_143052_a1b2c3d4",
-    "result_uri": "gs://your-project-media-output/results/20231201_143052_a1b2c3d4.json",
-    "transcript_uri": "gs://your-project-media-output/transcripts/20231201_143052_a1b2c3d4.txt",
-    "processing_time": 8.42,
-    "summary": {
-        "duration": 62.5,
-        "speaker_count": 2,
-        "overall_situation": "meeting"
-    }
-}
-```
-
-## Configuration Options
-
-Customize processing by passing a config object:
+## Step 5: View Results
 
 ```bash
-curl -X POST "$SERVICE_URL/process" \
-    -H "Content-Type: application/json" \
-    -d '{
-        "gcs_uri": "gs://bucket/audio.wav",
-        "config": {
-            "language_code": "en-US",
-            "model": "long",
-            "min_speakers": 2,
-            "max_speakers": 6
-        }
-    }'
+# Check output directory
+ls data/output/
+
+# View transcript
+cat data/output/my_recording_transcript.txt
+
+# View JSON results
+cat data/output/my_recording_results.json
 ```
 
-### Available Models
+## Example Commands
 
-| Model | Use Case |
-|-------|----------|
-| `long` | Recordings > 60 seconds (default) |
-| `short` | Recordings < 60 seconds |
-| `telephony` | Phone calls |
-| `video` | Video soundtracks |
+```bash
+# Basic transcription
+./run.sh meeting.wav
+
+# Faster processing (smaller model)
+./run.sh meeting.wav -m tiny.en
+
+# Without speaker diarization
+./run.sh meeting.wav --no-diarization
+
+# Auto-detect language
+./run.sh foreign_audio.wav -l auto
+
+# Process all files in directory
+./run.sh .
+
+# Verbose output
+./run.sh meeting.wav -v
+```
+
+## Sample Output
+
+### Terminal Output
+
+```
+Media Intelligence Pipeline
+Audio transcription, diarization, and situation detection
+
+Processing: meeting.wav
+Duration: 45.20s
+
+Step 1/4: Transcribing audio...
+  Found 12 segments
+
+Step 2/4: Identifying speakers...
+  Found 2 speakers
+
+Step 3/4: Detecting situations...
+  Overall situation: meeting
+
+Step 4/4: Saving outputs...
+  JSON: data/output/meeting_results.json
+  Transcript: data/output/meeting_transcript.txt
+  Situations: data/output/meeting_situations.txt
+
+✓ Processing complete
+
+╔═══════════════════╤══════════╗
+║ Metric            │ Value    ║
+╟───────────────────┼──────────╢
+║ Duration          │ 45.20s   ║
+║ Processing Time   │ 12.30s   ║
+║ RTF               │ 0.272    ║
+║ Segments          │ 12       ║
+║ Speakers          │ 2        ║
+║ Overall Situation │ meeting  ║
+╚═══════════════════╧══════════╝
+```
+
+### Transcript Output
+
+```
+Transcript: meeting.wav
+Duration: 45.20s
+Overall Situation: meeting
+================================================================================
+
+[0.00s - 2.50s] SPEAKER_00: Hello everyone, thanks for joining.
+[2.80s - 6.20s] SPEAKER_01: Thanks for having us. Let's get started.
+[6.50s - 12.00s] SPEAKER_00: First, I want to discuss the quarterly results.
+```
+
+## Common Issues
+
+### "No HuggingFace token"
+
+```
+⚠ Speaker diarization disabled: No HuggingFace token provided.
+```
+
+**Solution**: Add token to `.env` or use `--no-diarization`
+
+### "Input not found"
+
+```
+Error: Input not found: data/input/file.wav
+```
+
+**Solution**: Ensure file is in `data/input/` directory
+
+### Out of Memory
+
+**Solution**: Use a smaller model:
+```bash
+./run.sh file.wav -m tiny.en
+```
+
+### Slow Processing
+
+**Solutions**:
+- Use `.en` models for English audio (e.g., `base.en` instead of `base`)
+- Use smaller model (`tiny.en` or `base.en`)
+- Disable diarization: `--no-diarization`
+
+## Model Comparison
+
+| Model | Speed | Quality | Memory | Best For |
+|-------|-------|---------|--------|----------|
+| tiny.en | Fastest | Good | ~2GB | Quick previews, testing |
+| base.en | Fast | Better | ~4GB | **Recommended default** |
+| small.en | Medium | High | ~6GB | Accuracy-focused |
+| medium.en | Slow | Highest | ~8GB | Critical accuracy needs |
 
 ## Next Steps
 
-- Read the full [Deployment Guide](DEPLOYMENT.md)
-- Check the [API Documentation](docs/API.md)
-- Review [Cost Analysis](docs/COST_ANALYSIS.md)
-- Configure [Terraform variables](terraform/variables.tf) for production
+- Read the full [README.md](README.md) for advanced usage
+- Customize settings in `config.example.yaml`
+- See [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) for technical details
 
-## Troubleshooting
+## Getting Help
 
-### "Permission denied" errors
-
-Ensure the service account has the required permissions:
-
-```bash
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:media-processor@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/speech.client"
-```
-
-### File not processing
-
-Check Cloud Run logs:
-
-```bash
-gcloud run services logs read media-processor --region $REGION
-```
-
-### Slow processing
-
-- Check if you're using the correct model (use `short` for files < 60s)
-- Ensure the audio format is supported
-- Check Cloud Run scaling settings
-
-## Need Help?
-
-- [Full Documentation](README.md)
-- [GitHub Issues](https://github.com/your-org/media-intelligence-gcp/issues)
+- Check troubleshooting in [README.md](README.md#troubleshooting)
+- Run `./run.sh --help` for CLI options
+- Run `./test.sh` to validate your installation

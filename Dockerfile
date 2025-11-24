@@ -1,49 +1,98 @@
-# Media Intelligence Pipeline - Cloud Run Container
-# Build: docker build -t media-processor .
-# Run: docker run -p 8080:8080 media-processor
+# Copyright (c) 2025 Harrold Holdings GmbH
+# Licensed under the Apache License, Version 2.0
+# See LICENSE file in the project root for full license information.
 
-FROM python:3.11-slim
+# Media Intelligence Pipeline - Dockerfile
+# Multi-stage build for optimized image size
+
+# =============================================================================
+# Stage 1: Builder - Install dependencies and download models
+# =============================================================================
+FROM python:3.11-slim-bookworm AS builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8080 \
-    PYTHONPATH=/app
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
+    build-essential \
+    gcc \
+    g++ \
+    libffi-dev \
     libsndfile1 \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash appuser
-
-# Set working directory
-WORKDIR /app
-
-# Copy requirements first for better caching
-COPY requirements.txt .
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --upgrade pip && \
+    pip install -r /tmp/requirements.txt
+
+# Pre-download models to cache (optional - makes first run faster)
+# Note: HuggingFace models will be cached in /root/.cache/huggingface
+RUN python -c "from faster_whisper import WhisperModel; WhisperModel('base.en', device='cpu', compute_type='int8')" || true
+RUN python -c "from transformers import AutoFeatureExtractor, ASTForAudioClassification; \
+    AutoFeatureExtractor.from_pretrained('MIT/ast-finetuned-audioset-10-10-0.4593'); \
+    ASTForAudioClassification.from_pretrained('MIT/ast-finetuned-audioset-10-10-0.4593')" || true
+
+# =============================================================================
+# Stage 2: Runtime - Minimal image for production
+# =============================================================================
+FROM python:3.11-slim-bookworm AS runtime
+
+# Labels
+LABEL org.opencontainers.image.title="Media Intelligence Pipeline" \
+      org.opencontainers.image.description="Audio transcription, diarization, and situation detection" \
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.vendor="Harrold Holdings GmbH" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    OMP_NUM_THREADS=4 \
+    MKL_NUM_THREADS=4 \
+    TRANSFORMERS_CACHE=/root/.cache/huggingface \
+    HF_HOME=/root/.cache/huggingface
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsndfile1 \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy model cache from builder
+COPY --from=builder /root/.cache /root/.cache
+
+# Create application directory
+WORKDIR /app
 
 # Copy application code
-COPY config.yaml .
-COPY src/ ./src/
+COPY src/ /app/src/
 
-# Change ownership to non-root user
-RUN chown -R appuser:appuser /app
+# Create data directories
+RUN mkdir -p /data/input /data/output
 
-# Switch to non-root user
-USER appuser
+# Set up entrypoint
+ENTRYPOINT ["python", "-m", "src.process_audio"]
+CMD ["--help"]
 
-# Expose port
-EXPOSE 8080
+# Default volumes
+VOLUME ["/data/input", "/data/output", "/root/.cache"]
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
-
-# Run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "8", "--timeout", "3600", "src.main:app"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import src.utils; print('OK')" || exit 1

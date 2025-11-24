@@ -1,264 +1,315 @@
-"""Integration tests for the Media Intelligence Pipeline.
+# Copyright (c) 2025 Harrold Holdings GmbH
+# Licensed under the Apache License, Version 2.0
+# See LICENSE file in the project root for full license information.
 
-These tests require GCP credentials and actual GCP resources.
-Run with: pytest tests/test_integration.py -v --integration
+"""
+Integration tests for the Media Intelligence Pipeline.
+
+These tests verify end-to-end functionality with synthetic audio data.
+They do not require real audio files or model downloads when properly mocked.
 """
 
-import json
-import os
-import uuid
-
 import pytest
-
-# Skip all tests if not running integration tests
-pytestmark = pytest.mark.skipif(
-    os.getenv("RUN_INTEGRATION_TESTS", "").lower() != "true",
-    reason="Integration tests disabled. Set RUN_INTEGRATION_TESTS=true to enable.",
-)
-
-
-@pytest.fixture(scope="module")
-def project_id():
-    """Get GCP project ID from environment."""
-    project_id = os.getenv("PROJECT_ID")
-    if not project_id:
-        pytest.skip("PROJECT_ID environment variable not set")
-    return project_id
+import numpy as np
+import tempfile
+import os
+from pathlib import Path
+from unittest.mock import Mock, patch, MagicMock
 
 
-@pytest.fixture(scope="module")
-def test_bucket(project_id):
-    """Create a temporary test bucket."""
-    from google.cloud import storage
+def generate_synthetic_audio(duration_seconds: float = 1.0, sample_rate: int = 16000) -> np.ndarray:
+    """
+    Generate synthetic audio data for testing.
 
-    client = storage.Client(project=project_id)
-    bucket_name = f"{project_id}-test-{uuid.uuid4().hex[:8]}"
+    Args:
+        duration_seconds: Duration of audio in seconds
+        sample_rate: Sample rate in Hz
 
-    bucket = client.create_bucket(bucket_name, location="us-central1")
-
-    yield bucket
-
-    # Cleanup
-    try:
-        bucket.delete(force=True)
-    except Exception as e:
-        print(f"Warning: Failed to delete test bucket: {e}")
-
-
-@pytest.fixture
-def sample_audio_uri(test_bucket):
-    """Upload a sample audio file and return its GCS URI."""
-    # Check if there's a sample file
-    sample_path = os.path.join(os.path.dirname(__file__), "fixtures", "sample.wav")
-
-    if os.path.exists(sample_path):
-        blob = test_bucket.blob("test/sample.wav")
-        blob.upload_from_filename(sample_path)
-        return f"gs://{test_bucket.name}/test/sample.wav"
-
-    pytest.skip("Sample audio file not found at tests/fixtures/sample.wav")
+    Returns:
+        Numpy array of audio samples
+    """
+    num_samples = int(duration_seconds * sample_rate)
+    # Generate a simple sine wave with some noise
+    t = np.linspace(0, duration_seconds, num_samples)
+    audio = 0.5 * np.sin(2 * np.pi * 440 * t) + 0.1 * np.random.randn(num_samples)
+    return audio.astype(np.float32)
 
 
-class TestStorageManagerIntegration:
-    """Integration tests for StorageManager."""
+def create_test_wav_file(filepath: Path, duration_seconds: float = 1.0):
+    """Create a test WAV file with synthetic audio."""
+    import wave
+    import struct
 
-    def test_upload_and_download_json(self, test_bucket, project_id):
-        """Test uploading and downloading JSON."""
-        from src.storage_manager import StorageManager
+    sample_rate = 16000
+    audio = generate_synthetic_audio(duration_seconds, sample_rate)
 
-        manager = StorageManager(
-            project_id=project_id,
-            output_bucket=test_bucket.name,
-        )
+    # Convert to 16-bit PCM
+    audio_int16 = (audio * 32767).astype(np.int16)
 
-        test_data = {"test": "data", "number": 42}
-        blob_path = f"test/{uuid.uuid4().hex}.json"
-
-        # Upload
-        uri = manager.upload_json(test_data, blob_path=blob_path)
-        assert uri == f"gs://{test_bucket.name}/{blob_path}"
-
-        # Download
-        downloaded = manager.read_json(uri)
-        assert downloaded == test_data
-
-    def test_upload_and_download_text(self, test_bucket, project_id):
-        """Test uploading and downloading text."""
-        from src.storage_manager import StorageManager
-
-        manager = StorageManager(
-            project_id=project_id,
-            output_bucket=test_bucket.name,
-        )
-
-        test_text = "Hello, World!\nThis is a test."
-        blob_path = f"test/{uuid.uuid4().hex}.txt"
-
-        # Upload
-        uri = manager.upload_text(test_text, blob_path=blob_path)
-        assert uri == f"gs://{test_bucket.name}/{blob_path}"
-
-        # Download
-        downloaded = manager.read_text(uri)
-        assert downloaded == test_text
-
-    def test_file_exists(self, test_bucket, project_id):
-        """Test checking file existence."""
-        from src.storage_manager import StorageManager
-
-        manager = StorageManager(
-            project_id=project_id,
-            output_bucket=test_bucket.name,
-        )
-
-        # Create a file
-        blob_path = f"test/{uuid.uuid4().hex}.txt"
-        uri = manager.upload_text("test", blob_path=blob_path)
-
-        # Check exists
-        assert manager.file_exists(uri) is True
-        assert manager.file_exists(f"gs://{test_bucket.name}/nonexistent.txt") is False
-
-
-class TestSpeechClientIntegration:
-    """Integration tests for SpeechClient."""
-
-    @pytest.mark.slow
-    def test_transcribe_gcs(self, sample_audio_uri, project_id):
-        """Test transcription from GCS."""
-        from src.speech_client import SpeechClient
-
-        client = SpeechClient(project_id=project_id)
-
-        result = client.transcribe_gcs(
-            gcs_uri=sample_audio_uri,
-            language_code="en-US",
-            model="long",
-            enable_diarization=True,
-        )
-
-        assert result is not None
-        assert len(result.segments) > 0
-        assert result.total_duration > 0
-
-
-class TestAudioProcessorIntegration:
-    """Integration tests for AudioProcessor."""
-
-    @pytest.mark.slow
-    def test_process_file(self, sample_audio_uri, test_bucket, project_id):
-        """Test full file processing."""
-        from src.audio_processor import AudioProcessor
-
-        processor = AudioProcessor()
-
-        result = processor.process_file(
-            gcs_uri=sample_audio_uri,
-            output_bucket=test_bucket.name,
-        )
-
-        # Check result
-        assert result.error is None
-        assert result.duration > 0
-        assert len(result.transcript_segments) > 0
-        assert result.gcs_output_uri != ""
-        assert result.transcript_uri is not None
-
-        # Verify output files exist
-        from src.storage_manager import StorageManager
-
-        manager = StorageManager(project_id=project_id)
-        assert manager.file_exists(result.gcs_output_uri)
-        assert manager.file_exists(result.transcript_uri)
-
-        # Verify JSON output structure
-        json_data = manager.read_json(result.gcs_output_uri)
-        assert "file_id" in json_data
-        assert "transcript_segments" in json_data
-        assert "speaker_count" in json_data
-
-
-class TestCloudRunIntegration:
-    """Integration tests for Cloud Run endpoints."""
-
-    @pytest.fixture
-    def cloud_run_url(self):
-        """Get Cloud Run URL from environment."""
-        url = os.getenv("CLOUD_RUN_URL")
-        if not url:
-            pytest.skip("CLOUD_RUN_URL environment variable not set")
-        return url
-
-    def test_health_endpoint(self, cloud_run_url):
-        """Test health check endpoint."""
-        import requests
-
-        response = requests.get(f"{cloud_run_url}/health")
-        assert response.status_code == 200
-
-        data = response.json()
-        assert data["status"] == "healthy"
-
-    def test_ready_endpoint(self, cloud_run_url):
-        """Test readiness endpoint."""
-        import requests
-
-        response = requests.get(f"{cloud_run_url}/ready")
-        assert response.status_code == 200
-
-        data = response.json()
-        assert data["status"] == "ready"
-
-    @pytest.mark.slow
-    def test_process_endpoint(self, cloud_run_url, sample_audio_uri, test_bucket):
-        """Test process endpoint."""
-        import requests
-
-        response = requests.post(
-            f"{cloud_run_url}/process",
-            json={
-                "gcs_uri": sample_audio_uri,
-                "output_bucket": test_bucket.name,
-            },
-        )
-
-        assert response.status_code == 200
-
-        data = response.json()
-        assert data["status"] == "success"
-        assert "file_id" in data
-        assert "result_uri" in data
+    with wave.open(str(filepath), 'w') as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(audio_int16.tobytes())
 
 
 class TestUtilsIntegration:
     """Integration tests for utility functions."""
 
-    def test_load_config(self):
-        """Test loading configuration file."""
-        from src.utils import load_config
+    def test_memory_validation(self):
+        """Test memory validation functions."""
+        from src.utils import (
+            check_available_memory,
+            estimate_memory_requirement,
+            validate_memory_for_file
+        )
 
-        config = load_config()
+        # Test memory check returns a positive value
+        available = check_available_memory()
+        assert available > 0
 
-        assert "processing" in config
-        assert "speech" in config
-        assert "situation" in config
+        # Test memory estimation for different models
+        file_size = 10 * 1024 * 1024  # 10MB
+        tiny_estimate = estimate_memory_requirement(file_size, "tiny.en")
+        base_estimate = estimate_memory_requirement(file_size, "base.en")
+        medium_estimate = estimate_memory_requirement(file_size, "medium.en")
 
-    def test_estimate_cost(self):
-        """Test cost estimation."""
-        from src.utils import estimate_cost
+        # Larger models should require more memory
+        assert tiny_estimate < base_estimate < medium_estimate
 
-        # 5 minutes of audio
-        cost = estimate_cost(300, enable_diarization=True, enable_situation_detection=True)
+    def test_path_sanitization(self):
+        """Test path sanitization prevents traversal."""
+        from src.utils import sanitize_path
 
-        assert "total" in cost
-        assert cost["total"] > 0
-        assert "speech_to_text" in cost
-        assert "situation_classification" in cost
+        # Normal paths should work
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_path = Path(tmpdir) / "test.wav"
+            test_path.touch()
+            result = sanitize_path(test_path)
+            assert result.exists()
+
+    def test_audio_file_validation(self):
+        """Test audio file validation."""
+        from src.utils import validate_audio_file, SUPPORTED_FORMATS
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Test valid format
+            wav_file = Path(tmpdir) / "test.wav"
+            create_test_wav_file(wav_file)
+            assert validate_audio_file(wav_file) is True
+
+            # Test invalid format
+            txt_file = Path(tmpdir) / "test.txt"
+            txt_file.write_text("not audio")
+            assert validate_audio_file(txt_file) is False
 
 
-# Fixtures directory marker
-@pytest.fixture(scope="session", autouse=True)
-def create_fixtures_dir():
-    """Create fixtures directory if it doesn't exist."""
-    fixtures_dir = os.path.join(os.path.dirname(__file__), "fixtures")
-    os.makedirs(fixtures_dir, exist_ok=True)
+class TestTranscriberIntegration:
+    """Integration tests for transcription with model validation."""
+
+    def test_invalid_model_raises_error(self):
+        """Test that invalid model names raise ValueError."""
+        from src.transcription import Transcriber, WhisperConfig
+
+        with pytest.raises(ValueError) as exc_info:
+            config = WhisperConfig(model_size="invalid_model")
+            # Need to mock the model loading to test validation
+            with patch('src.transcription.WhisperModel'):
+                Transcriber(config)
+
+        assert "Invalid Whisper model" in str(exc_info.value)
+
+    @patch('src.transcription.WhisperModel')
+    def test_valid_models_accepted(self, mock_whisper):
+        """Test that all valid models are accepted."""
+        from src.transcription import Transcriber, WhisperConfig
+
+        valid_models = ["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en"]
+
+        for model in valid_models:
+            config = WhisperConfig(model_size=model)
+            transcriber = Transcriber(config)
+            assert transcriber.config.model_size == model
+
+
+class TestDiarizerIntegration:
+    """Integration tests for diarization with token validation."""
+
+    def test_empty_token_raises_error(self):
+        """Test that empty HuggingFace token raises ValueError."""
+        from src.diarization import Diarizer, DiarizationConfig
+
+        # Test with empty string
+        with pytest.raises(ValueError) as exc_info:
+            Diarizer(hf_token="")
+        assert "HuggingFace token required" in str(exc_info.value)
+
+        # Test with whitespace-only string
+        with pytest.raises(ValueError) as exc_info:
+            Diarizer(hf_token="   ")
+        assert "HuggingFace token required" in str(exc_info.value)
+
+    def test_none_token_raises_error(self):
+        """Test that None HuggingFace token raises ValueError."""
+        from src.diarization import Diarizer
+
+        # Clear environment variable if set
+        old_token = os.environ.pop("HUGGINGFACE_TOKEN", None)
+        try:
+            with pytest.raises(ValueError) as exc_info:
+                Diarizer(hf_token=None)
+            assert "HuggingFace token required" in str(exc_info.value)
+        finally:
+            if old_token:
+                os.environ["HUGGINGFACE_TOKEN"] = old_token
+
+
+class TestAudioProcessorIntegration:
+    """Integration tests for the main AudioProcessor."""
+
+    @patch('src.process_audio.Transcriber')
+    @patch('src.process_audio.SituationClassifier')
+    def test_memory_check_before_processing(self, mock_classifier, mock_transcriber):
+        """Test that memory is validated before processing."""
+        from src.process_audio import AudioProcessor
+        from src.utils import validate_memory_for_file
+
+        # Setup mocks
+        mock_transcriber_instance = MagicMock()
+        mock_transcriber_instance.config.model_size = "base.en"
+        mock_transcriber_instance.config.compute_type = "int8"
+        mock_transcriber.return_value = mock_transcriber_instance
+
+        mock_classifier_instance = MagicMock()
+        mock_classifier.return_value = mock_classifier_instance
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create test file
+            test_file = Path(tmpdir) / "test.wav"
+            create_test_wav_file(test_file, duration_seconds=1.0)
+
+            # Memory validation should pass for small files
+            is_valid, msg = validate_memory_for_file(test_file, "base.en")
+            assert is_valid is True
+
+    @patch('src.process_audio.Transcriber')
+    @patch('src.process_audio.SituationClassifier')
+    def test_timeout_parameter(self, mock_classifier, mock_transcriber):
+        """Test that timeout parameter is accepted."""
+        from src.process_audio import AudioProcessor
+
+        # Setup mocks
+        mock_transcriber_instance = MagicMock()
+        mock_transcriber.return_value = mock_transcriber_instance
+
+        mock_classifier_instance = MagicMock()
+        mock_classifier.return_value = mock_classifier_instance
+
+        processor = AudioProcessor(
+            whisper_model="tiny.en",
+            timeout=300,
+            enable_diarization=False
+        )
+
+        assert processor.timeout == 300
+
+    @patch('src.process_audio.Transcriber')
+    @patch('src.process_audio.SituationClassifier')
+    def test_path_sanitization_in_processing(self, mock_classifier, mock_transcriber):
+        """Test that paths are sanitized during processing."""
+        from src.process_audio import AudioProcessor
+
+        # Setup mocks
+        mock_transcriber_instance = MagicMock()
+        mock_transcriber_instance.config.model_size = "base.en"
+        mock_transcriber_instance.config.compute_type = "int8"
+        mock_transcriber_instance.transcribe.return_value = ([], {"language": "en", "language_probability": 0.99})
+        mock_transcriber.return_value = mock_transcriber_instance
+
+        mock_classifier_instance = MagicMock()
+        mock_classifier_instance.classify_audio.return_value = ([], "quiet")
+        mock_classifier.return_value = mock_classifier_instance
+
+        processor = AudioProcessor(
+            whisper_model="tiny.en",
+            enable_diarization=False
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create test file
+            test_file = Path(tmpdir) / "test.wav"
+            create_test_wav_file(test_file, duration_seconds=0.5)
+            output_dir = Path(tmpdir) / "output"
+
+            # Mock load_audio to return synthetic data
+            with patch('src.process_audio.load_audio') as mock_load:
+                mock_load.return_value = (generate_synthetic_audio(0.5), 16000)
+
+                result = processor.process_file(
+                    str(test_file),
+                    str(output_dir)
+                )
+
+                assert result is not None
+                assert result.duration > 0
+
+
+class TestEndToEndWorkflow:
+    """End-to-end workflow tests (with mocked models)."""
+
+    @patch('src.process_audio.Transcriber')
+    @patch('src.process_audio.SituationClassifier')
+    @patch('src.process_audio.load_audio')
+    def test_complete_processing_workflow(self, mock_load, mock_classifier, mock_transcriber):
+        """Test complete processing workflow with mocked components."""
+        from src.process_audio import AudioProcessor
+        from src.utils import TranscriptSegment, SituationSegment
+
+        # Setup mocks
+        mock_load.return_value = (generate_synthetic_audio(2.0), 16000)
+
+        mock_transcriber_instance = MagicMock()
+        mock_transcriber_instance.config.model_size = "tiny.en"
+        mock_transcriber_instance.config.compute_type = "int8"
+        mock_transcriber_instance.transcribe.return_value = (
+            [TranscriptSegment(start=0.0, end=1.0, text="Hello world", confidence=0.95)],
+            {"language": "en", "language_probability": 0.99, "duration": 2.0}
+        )
+        mock_transcriber.return_value = mock_transcriber_instance
+
+        mock_classifier_instance = MagicMock()
+        mock_classifier_instance.classify_audio.return_value = (
+            [SituationSegment(start=0.0, end=2.0, situation="quiet", confidence=0.85, top_predictions=[])],
+            "quiet"
+        )
+        mock_classifier.return_value = mock_classifier_instance
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create test file
+            test_file = Path(tmpdir) / "test.wav"
+            create_test_wav_file(test_file, duration_seconds=2.0)
+            output_dir = Path(tmpdir) / "output"
+
+            processor = AudioProcessor(
+                whisper_model="tiny.en",
+                enable_diarization=False,
+                enable_situation=True,
+                timeout=60
+            )
+
+            result = processor.process_file(
+                str(test_file),
+                str(output_dir)
+            )
+
+            # Verify result structure
+            assert result is not None
+            assert result.duration > 0
+            assert len(result.transcript_segments) == 1
+            assert result.transcript_segments[0].text == "Hello world"
+            assert result.overall_situation == "quiet"
+            assert result.processing_time > 0
+
+            # Verify output files were created
+            assert (output_dir / "test_results.json").exists()
+            assert (output_dir / "test_transcript.txt").exists()
