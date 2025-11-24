@@ -48,10 +48,31 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 pytest_cache/
+cover/
 
 # Translations
 *.mo
 *.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -63,8 +84,34 @@ ipython_config.py
 # pyenv
 .python-version
 
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+.pdm-python
+.pdm-build/
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
 # Environments
 .env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
 .venv
 env/
 venv/
@@ -102,12 +149,15 @@ cython_debug/
 *.swp
 *.swo
 *~
+.project
+.pydevproject
+.settings/
 
 # Docker/Podman
 .docker/
 *.tar
 
-# Project specific
+# Project specific - Local deployment
 data/input/*
 !data/input/.gitkeep
 data/output/*
@@ -118,16 +168,28 @@ models/*
 !models/.gitkeep
 
 # Logs
-*.log
 logs/
 
-# Secrets (never commit these!)
-.env.local
-.env.*.local
+# GCP
+.gcloud/
+credentials.json
+service-account*.json
+*-key.json
 *.pem
 *.key
-credentials.json
 secrets.yaml
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfplan
+terraform/.terraform.lock.hcl
+terraform/crash.log
+terraform/override.tf
+terraform/override.tf.json
+terraform/*_override.tf
+terraform/*_override.tf.json
 
 # OS specific
 .DS_Store
@@ -137,18 +199,21 @@ secrets.yaml
 .Trashes
 ehthumbs.db
 Thumbs.db
+*.bak
 
-# Audio/video files (don't commit large media files)
+# Audio/Media files (too large for git)
 *.wav
 *.mp3
 *.m4a
 *.flac
 *.ogg
 *.opus
+*.aac
 *.mp4
 *.avi
-*.mkv
 *.mov
+*.mkv
+*.webm
 
 # Model files (too large for git)
 *.pt
@@ -156,3 +221,8 @@ Thumbs.db
 *.bin
 *.onnx
 *.safetensors
+
+# Test outputs
+test_output/
+output/
+results/

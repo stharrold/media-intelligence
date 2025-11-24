@@ -4,4 +4,6 @@
 
 """
 Media Intelligence Pipeline - Test Suite
+
+Tests for both local and GCP deployment modes.
 """
