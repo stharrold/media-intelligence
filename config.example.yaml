@@ -1,0 +1,104 @@
+# Media Intelligence Pipeline - Advanced Configuration
+# Copy this file to config.yaml to customize settings
+
+# Transcription settings
+transcription:
+  # Whisper model: tiny, tiny.en, base, base.en, small, small.en, medium, medium.en
+  model: "base.en"
+
+  # Compute type: int8 (fastest), float16, float32 (most accurate)
+  compute_type: "int8"
+
+  # Device: cpu or cuda
+  device: "cpu"
+
+  # Beam size for decoding (1-10, higher = more accurate but slower)
+  beam_size: 5
+
+  # Language code (en, de, fr, etc.) or "auto" for detection
+  language: "en"
+
+  # Enable word-level timestamps
+  word_timestamps: true
+
+  # Voice activity detection filter
+  vad_filter: true
+
+  # Minimum silence duration for VAD (seconds)
+  vad_min_silence_duration_ms: 500
+
+# Diarization settings
+diarization:
+  # Enable speaker diarization (requires HuggingFace token)
+  enabled: true
+
+  # Pipeline model
+  pipeline: "pyannote/speaker-diarization-3.1"
+
+  # Minimum number of speakers (0 = auto-detect)
+  min_speakers: 0
+
+  # Maximum number of speakers (0 = auto-detect)
+  max_speakers: 0
+
+# Situation classification settings
+situation:
+  # Enable situation/scene classification
+  enabled: true
+
+  # AST model for AudioSet classification
+  model: "MIT/ast-finetuned-audioset-10-10-0.4593"
+
+  # Segment duration for classification (seconds)
+  segment_duration: 30.0
+
+  # Confidence threshold for situation assignment
+  confidence_threshold: 0.3
+
+# Output settings
+output:
+  # Generate JSON output
+  json: true
+
+  # Generate human-readable transcript
+  txt: true
+
+  # Generate situation report
+  situations: true
+
+  # Include word-level timestamps in output
+  word_timestamps: false
+
+  # Pretty-print JSON output
+  json_indent: 2
+
+# Processing settings
+processing:
+  # Number of CPU workers
+  workers: 4
+
+  # Batch size for processing multiple files
+  batch_size: 1
+
+  # Show progress bars
+  show_progress: true
+
+  # Verbose logging
+  verbose: false
+
+# Resource limits
+resources:
+  # Maximum memory usage (GB)
+  max_memory_gb: 8
+
+  # CPU thread limit
+  max_threads: 4
+
+# Supported audio formats
+formats:
+  - ".wav"
+  - ".mp3"
+  - ".m4a"
+  - ".flac"
+  - ".ogg"
+  - ".opus"
