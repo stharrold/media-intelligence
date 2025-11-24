@@ -321,7 +321,7 @@ def process_audio_gcs(cloud_event):
         logger.info(f"Cloud Function triggered for {gcs_uri}")
 
         # Check if file should be processed
-        from .utils import is_supported_format
+        from .gcp_utils import is_supported_format
 
         if not is_supported_format(gcs_uri):
             logger.info(f"Skipping unsupported format: {gcs_uri}")

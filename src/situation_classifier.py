@@ -278,16 +278,21 @@ class SituationClassifier:
         predictions = []
         num_segments = max(1, int(total_duration / segment_duration))
 
-        # Generate mock predictions
+        # Generate mock predictions with seeded random for deterministic tests
+        import hashlib
         import random
+
+        # Seed based on GCS URI for deterministic results in tests
+        seed = int(hashlib.md5(gcs_uri.encode()).hexdigest()[:8], 16)
+        rng = random.Random(seed)
 
         for i in range(num_segments):
             start_time = i * segment_duration
             end_time = min((i + 1) * segment_duration, total_duration)
 
-            # Random situation for mock
-            situation = random.choice(self.labels)
-            confidence = random.uniform(0.6, 0.95)
+            # Deterministic situation for mock based on seed
+            situation = rng.choice(self.labels)
+            confidence = rng.uniform(0.6, 0.95)
 
             predictions.append(
                 SituationPrediction(

@@ -6,13 +6,14 @@ import json
 import logging
 import os
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Generator
 
 from google.cloud import storage
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from .utils import generate_file_id, parse_gcs_uri
+from .gcp_utils import generate_file_id, parse_gcs_uri
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,34 @@ class StorageManager:
         blob.download_to_filename(local_path)
 
         return local_path
+
+    @contextmanager
+    def download_temp_file(self, gcs_uri: str) -> Generator[str, None, None]:
+        """
+        Context manager for downloading a file to a temp location with automatic cleanup.
+
+        Args:
+            gcs_uri: GCS URI (gs://bucket/path/to/file).
+
+        Yields:
+            Local path to downloaded file.
+
+        Example:
+            with storage_manager.download_temp_file("gs://bucket/audio.wav") as local_path:
+                process_audio(local_path)
+            # File is automatically cleaned up after the block
+        """
+        local_path = self.download_file(gcs_uri)
+        try:
+            yield local_path
+        finally:
+            # Clean up temp file
+            try:
+                if os.path.exists(local_path):
+                    os.remove(local_path)
+                    logger.debug(f"Cleaned up temp file: {local_path}")
+            except OSError as e:
+                logger.warning(f"Failed to clean up temp file {local_path}: {e}")
 
     @retry(
         stop=stop_after_attempt(3),
