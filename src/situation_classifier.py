@@ -372,7 +372,7 @@ class SituationClassifier:
             try:
                 import librosa
 
-                duration = librosa.get_duration(path=local_path)
+                duration = librosa.get_duration(filename=local_path)
                 return duration
             except Exception:
                 # Fallback: assume 60 seconds

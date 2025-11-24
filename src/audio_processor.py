@@ -3,7 +3,6 @@ Main audio processing orchestrator for the Media Intelligence Pipeline.
 """
 
 import logging
-import os
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -13,7 +12,7 @@ from typing import Any
 from .situation_classifier import SituationClassifier, SituationPrediction, SituationResult
 from .speech_client import SpeechClient, TranscriptSegment, TranscriptionResult
 from .storage_manager import StorageManager
-from .utils import (
+from .gcp_utils import (
     estimate_cost,
     format_timestamp,
     generate_file_id,
@@ -21,7 +20,6 @@ from .utils import (
     get_file_extension,
     is_supported_format,
     load_config,
-    parse_gcs_uri,
     validate_audio_duration,
 )
 

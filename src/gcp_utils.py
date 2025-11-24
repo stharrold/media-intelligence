@@ -1,16 +1,19 @@
 """
-Utility functions for the Media Intelligence Pipeline.
+Utility functions for the Media Intelligence Pipeline (GCP deployment).
 """
 
+import logging
 import math
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import yaml
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -32,8 +35,12 @@ def load_config(config_path: str | None = None) -> dict[str, Any]:
         project_root = Path(__file__).parent.parent
         config_path = project_root / "config.yaml"
 
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
+    try:
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+    except FileNotFoundError:
+        logger.warning(f"Config file not found: {config_path}, using defaults")
+        config = {}
 
     # Override with environment variables
     env_overrides = {
@@ -58,7 +65,7 @@ def generate_file_id() -> str:
     Returns:
         Unique file ID string.
     """
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     unique_id = uuid.uuid4().hex[:8]
     return f"{timestamp}_{unique_id}"
 
@@ -76,7 +83,7 @@ def get_audio_duration(file_path: str) -> float:
     try:
         import librosa
 
-        duration = librosa.get_duration(path=file_path)
+        duration = librosa.get_duration(filename=file_path)
         return duration
     except Exception:
         # Fallback using soundfile

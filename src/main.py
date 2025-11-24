@@ -5,10 +5,8 @@ This module provides both HTTP endpoints (for Cloud Run) and event handlers
 (for Cloud Functions) for processing audio files.
 """
 
-import json
 import logging
 import os
-import sys
 from typing import Any
 
 import functions_framework
