@@ -25,6 +25,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import duckdb
+
 # Add workflow-utilities to path for worktree_context
 sys.path.insert(
     0,
@@ -34,6 +36,7 @@ sys.path.insert(
 # Constants with documented rationale
 SCHEMA_VERSION = "1.0.0"  # Current schema version for migrations
 WORKFLOW_STATES_PATH = Path(__file__).parent.parent / "templates" / "workflow-states.json"
+SYNC_SCHEMA_PATH = Path(__file__).parent.parent / "schemas" / "agentdb_sync_schema.sql"
 
 
 def get_default_db_path() -> Path:
@@ -141,139 +144,139 @@ def load_workflow_states() -> dict[str, Any]:
         error_exit(f"Failed to load workflow-states.json: {e}")
 
 
-def create_schema(session_id: str, workflow_states: dict[str, Any]) -> bool:
+def create_schema(session_id: str, workflow_states: dict[str, Any], db_path: Path) -> bool:
     """Create AgentDB schema with tables and indexes.
 
     Args:
         session_id: AgentDB session identifier
         workflow_states: State definitions from workflow-states.json
+        db_path: Path to DuckDB database file
 
     Returns:
         True if schema created successfully, False otherwise
-
-    Note: This function currently contains placeholder SQL. In actual execution,
-    these SQL statements would be sent to AgentDB using the AgentDB tool.
     """
     info("Creating AgentDB schema...")
 
-    # NOTE: In actual execution, these SQL statements would be sent to AgentDB
-    # using the AgentDB tool available in Claude Code. For now, we print them
-    # as a reference implementation.
+    try:
+        # Ensure parent directory exists
+        db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    sql_statements = [
-        # Session metadata table
-        """
-        CREATE TABLE IF NOT EXISTS session_metadata (
-            key VARCHAR PRIMARY KEY,
-            value VARCHAR
-        );
-        """,
-        # Insert session metadata
-        f"""
-        INSERT INTO session_metadata (key, value)
-        VALUES
-            ('session_id', '{session_id}'),
-            ('schema_version', '{SCHEMA_VERSION}'),
-            ('workflow_version', '{workflow_states.get("version", "unknown")}'),
-            ('initialized_at', current_timestamp)
-        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
-        """,
-        # Immutable workflow records table (append-only)
-        """
-        CREATE TABLE IF NOT EXISTS workflow_records (
-            record_id UUID PRIMARY KEY DEFAULT uuid(),
-            record_datetimestamp TIMESTAMP DEFAULT current_timestamp,
-            object_id VARCHAR NOT NULL,
-            object_type VARCHAR NOT NULL,
-            object_state VARCHAR NOT NULL,
-            object_metadata JSON
-        );
-        """,
-        # Indexes for efficient queries
-        """
-        CREATE INDEX IF NOT EXISTS idx_records_object
-        ON workflow_records(object_id, record_datetimestamp DESC);
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_records_type_state
-        ON workflow_records(object_type, object_state);
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_records_timestamp
-        ON workflow_records(record_datetimestamp);
-        """,
-        # State transitions view for analysis
-        """
-        CREATE OR REPLACE VIEW state_transitions AS
-        SELECT
-            record_id,
-            object_id,
-            object_type,
-            LAG(object_state) OVER (PARTITION BY object_id ORDER BY record_datetimestamp) as from_state,
-            object_state as to_state,
-            record_datetimestamp
-        FROM workflow_records;
-        """,
-    ]
+        # Connect to DuckDB
+        conn = duckdb.connect(str(db_path))
 
-    # NOTE: Placeholder for actual AgentDB execution (not dead code)
-    # In production, would call: agentdb_execute(session_id, sql) for each statement
-    # Current implementation outputs SQL for manual execution/verification
+        # Load and execute the sync schema SQL file
+        if SYNC_SCHEMA_PATH.exists():
+            print(f"\n{Colors.BOLD}Executing sync schema from {SYNC_SCHEMA_PATH.name}:{Colors.END}")
+            schema_sql = SYNC_SCHEMA_PATH.read_text()
 
-    print(f"\n{Colors.BOLD}Schema SQL (to be executed via AgentDB):{Colors.END}")
-    for i, sql in enumerate(sql_statements, 1):
-        print(f"\n-- Statement {i}")
-        print(sql.strip())
+            # Remove SQL comments
+            import re
 
-    success("Schema definition prepared")
-    warning("NOTE: In actual execution, these SQL statements would be sent to AgentDB")
+            # Remove single-line comments (-- ...)
+            schema_sql = re.sub(r"--[^\n]*\n", "\n", schema_sql)
 
-    return True
+            # Split by semicolons
+            statements = [s.strip() for s in schema_sql.split(";") if s.strip()]
+
+            # Execute all statements
+            success_count = 0
+            for i, stmt in enumerate(statements, 1):
+                if stmt:
+                    try:
+                        conn.execute(stmt)
+                        success_count += 1
+                    except Exception as e:
+                        if "already exists" not in str(e).lower():
+                            # Only warn for non-trivial errors
+                            if "SELECT" not in stmt[:20]:  # Skip validation queries
+                                warning(f"  Statement {i}: {str(e)[:60]}")
+            print(f"  ✓ Executed {success_count} statements")
+        else:
+            warning(f"Sync schema not found: {SYNC_SCHEMA_PATH}")
+
+        # Create session metadata table
+        print(f"\n{Colors.BOLD}Creating session metadata:{Colors.END}")
+
+        session_statements = [
+            """
+            CREATE TABLE IF NOT EXISTS session_metadata (
+                key VARCHAR PRIMARY KEY,
+                value VARCHAR
+            );
+            """,
+            f"""
+            INSERT INTO session_metadata (key, value)
+            VALUES
+                ('session_id', '{session_id}'),
+                ('schema_version', '{SCHEMA_VERSION}'),
+                ('workflow_version', '{workflow_states.get("version", "unknown")}'),
+                ('initialized_at', current_timestamp)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+            """,
+        ]
+
+        for stmt in session_statements:
+            conn.execute(stmt.strip())
+
+        conn.close()
+        success(f"Schema created in {db_path}")
+        return True
+
+    except Exception as e:
+        error_exit(f"Schema creation failed: {e}")
 
 
-def validate_schema(session_id: str) -> bool:
+def validate_schema(db_path: Path) -> bool:
     """Validate that schema was created correctly.
 
     Args:
-        session_id: AgentDB session identifier
+        db_path: Path to DuckDB database file
 
     Returns:
         True if validation passed, False otherwise
-
-    Note: In actual execution, would query AgentDB to verify tables exist.
     """
     info("Validating schema...")
 
-    # In actual execution, would query AgentDB:
-    # tables = agentdb_query(session_id, "SELECT table_name FROM information_schema.tables")
+    try:
+        conn = duckdb.connect(str(db_path))
 
-    validation_queries = [
-        "SELECT table_name FROM information_schema.tables WHERE table_name = 'session_metadata';",
-        "SELECT table_name FROM information_schema.tables WHERE table_name = 'workflow_records';",
-        "SELECT COUNT(*) FROM session_metadata;",
-    ]
+        # Check tables exist
+        tables = conn.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+        ).fetchall()
+        table_names = [t[0] for t in tables]
 
-    print(f"\n{Colors.BOLD}Validation queries (to be executed via AgentDB):{Colors.END}")
-    for query in validation_queries:
-        print(f"  {query}")
+        required_tables = ["session_metadata", "agent_synchronizations"]
+        for table in required_tables:
+            if table not in table_names:
+                error_exit(f"{table} table not found")
 
-    success("Schema validation prepared")
-    warning("NOTE: In actual execution, would verify tables exist in AgentDB")
+        # Check session metadata
+        count = conn.execute("SELECT COUNT(*) FROM session_metadata").fetchone()[0]
+        if count < 4:
+            warning(f"Expected 4 metadata rows, found {count}")
 
-    return True
+        conn.close()
+        success("Schema validation passed")
+        return True
+
+    except Exception as e:
+        error_exit(f"Schema validation failed: {e}")
 
 
-def print_summary(session_id: str, workflow_states: dict[str, Any]) -> None:
+def print_summary(session_id: str, workflow_states: dict[str, Any], db_path: Path) -> None:
     """Print initialization summary.
 
     Args:
         session_id: AgentDB session identifier
         workflow_states: Loaded state definitions
+        db_path: Path to DuckDB database file
     """
     print(f"\n{Colors.BOLD}{'=' * 70}{Colors.END}")
     print(f"{Colors.BOLD}AgentDB Initialization Complete{Colors.END}")
     print(f"{Colors.BOLD}{'=' * 70}{Colors.END}\n")
 
+    print(f"{Colors.BLUE}Database:{Colors.END} {db_path}")
     print(f"{Colors.BLUE}Session ID:{Colors.END} {session_id}")
     print(f"{Colors.BLUE}Schema Version:{Colors.END} {SCHEMA_VERSION}")
     print(f"{Colors.BLUE}Workflow Version:{Colors.END} {workflow_states.get('version', 'unknown')}")
@@ -285,25 +288,20 @@ def print_summary(session_id: str, workflow_states: dict[str, Any]) -> None:
 
     print(f"\n{Colors.BOLD}Created Tables:{Colors.END}")
     print("  ✓ session_metadata (session configuration)")
-    print("  ✓ workflow_records (immutable append-only)")
-
-    print(f"\n{Colors.BOLD}Created Indexes:{Colors.END}")
-    print("  ✓ idx_records_object (object_id, record_datetimestamp DESC)")
-    print("  ✓ idx_records_type_state (object_type, object_state)")
-    print("  ✓ idx_records_timestamp (record_datetimestamp)")
+    print("  ✓ schema_metadata (schema versioning)")
+    print("  ✓ agent_synchronizations (workflow sync events)")
+    print("  ✓ sync_executions (execution details)")
+    print("  ✓ sync_audit_trail (HIPAA compliance audit)")
 
     print(f"\n{Colors.BOLD}Created Views:{Colors.END}")
-    print("  ✓ state_transitions (temporal state change analysis)")
+    print("  ✓ v_current_sync_status (latest sync state)")
+    print("  ✓ v_phi_access_audit (HIPAA compliance)")
+    print("  ✓ v_sync_performance (metrics)")
 
     print(f"\n{Colors.BOLD}Next Steps:{Colors.END}")
-    print("  1. Sync TODO files: python sync_todo_to_db.py")
-    print("  2. Query state: python query_state.py")
+    print("  1. Record workflow transition: python record_sync.py --pattern phase_1_specify")
+    print("  2. Query workflow state: python query_workflow_state.py")
     print("  3. Analyze metrics: python analyze_metrics.py")
-
-    print(f"\n{Colors.BOLD}Session Lifetime:{Colors.END}")
-    print("  • AgentDB persists for 24 hours, then auto-deleted")
-    print("  • Re-run this script at the start of new sessions")
-    print("  • TODO_*.md files remain source of truth")
 
     print(f"\n{Colors.GREEN}🎉 AgentDB ready for workflow state tracking!{Colors.END}\n")
 
@@ -321,20 +319,23 @@ Examples:
   # Initialize with specific session ID
   python init_database.py --session-id abc123def456
 
-Note:
-  This script prepares SQL statements for AgentDB. In actual execution with
-  Claude Code's AgentDB tool, these statements would be executed against the
-  database.
+  # Initialize with custom database path
+  python init_database.py --db-path /path/to/agentdb.duckdb
 """,
     )
 
     parser.add_argument("--session-id", type=str, help="AgentDB session ID (auto-generated if not provided)")
+    parser.add_argument("--db-path", type=str, help="Path to DuckDB database file (default: .claude-state/agentdb.duckdb)")
 
     args = parser.parse_args()
 
     print(f"\n{Colors.BOLD}{'=' * 70}{Colors.END}")
     print(f"{Colors.BOLD}AgentDB Initialization{Colors.END}")
     print(f"{Colors.BOLD}{'=' * 70}{Colors.END}\n")
+
+    # Get database path
+    db_path = Path(args.db_path) if args.db_path else get_default_db_path()
+    info(f"Database path: {db_path}")
 
     # Generate or use provided session ID
     session_id = args.session_id or generate_session_id()
@@ -347,15 +348,15 @@ Note:
     workflow_states = load_workflow_states()
 
     # Create schema
-    if not create_schema(session_id, workflow_states):
+    if not create_schema(session_id, workflow_states, db_path):
         error_exit("Schema creation failed")
 
     # Validate schema
-    if not validate_schema(session_id):
+    if not validate_schema(db_path):
         error_exit("Schema validation failed")
 
     # Print summary
-    print_summary(session_id, workflow_states)
+    print_summary(session_id, workflow_states, db_path)
 
 
 if __name__ == "__main__":
