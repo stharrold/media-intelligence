@@ -1,3 +1,18 @@
+---
+type: claude-context
+directory: .
+purpose: Containerized audio processing system for extracting structured intelligence from recorded media
+parent: null
+sibling_readme: README.md
+children:
+  - .claude/CLAUDE.md
+  - src/CLAUDE.md
+  - tests/CLAUDE.md
+  - terraform/CLAUDE.md
+  - planning/CLAUDE.md
+  - specs/CLAUDE.md
+---
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -9,61 +24,80 @@ Media Intelligence Pipeline: A containerized audio processing system for extract
 - **Local**: CPU-only containerized pipeline (air-gapped deployment ready)
 - **GCP**: Cloud-native pipeline using Google Cloud managed services
 
-## Container Runtime
+**Key Principle**: All development uses `podman-compose run --rm dev <command>`. One way to run everything.
 
-This project uses **Podman** as the primary container runtime (OCI-compatible).
-
-### Prerequisites
+## Essential Commands
 
 ```bash
-podman --version          # 4.0+ required
-podman-compose --version  # For compose operations
-```
+# Build container (once)
+podman-compose build
 
-## Build and Test Commands
+# Run any command (containerized - preferred)
+podman-compose run --rm dev <command>
 
-### Local Deployment (Podman)
+# Common operations
+podman-compose run --rm dev pytest tests/              # Run tests
+podman-compose run --rm dev pytest tests/ -v -k test_  # Single test
+podman-compose run --rm dev ruff check .               # Lint
+podman-compose run --rm dev ruff check --fix .         # Auto-fix
 
-```bash
-# Build and run (wrapper scripts auto-detect podman/docker)
+# Build and run production container
 ./build.sh              # Build container image
 ./run.sh <audio.wav>    # Process audio file
 ./test.sh               # Run validation tests
 
-# Direct Podman commands
-podman build -f Containerfile -t media-intelligence:latest .
-podman run --rm -v ./data/input:/data/input:ro,Z \
-    -v ./data/output:/data/output:rw,Z \
-    media-intelligence:latest <audio.wav>
-
-# Podman Compose
-podman-compose build
-podman-compose run --rm media-intelligence <audio.wav>
+# GCP Deployment
+./deploy.sh --project PROJECT_ID --region REGION
+./test_gcp.sh
 ```
 
-### Development Container
+## Workflow System
 
-```bash
-# Build development container (with uv)
-podman build -f Containerfile.dev -t media-intelligence-dev .
+This repository uses a **skill-based workflow system** (v5.3) located in `.claude/skills/`.
 
-# Run tests in container
-podman-compose run --rm dev pytest tests/
-podman-compose run --rm dev pytest tests/ -v -k test_transcription
+### Slash Commands
 
-# Run linting
-podman-compose run --rm dev ruff check .
-podman-compose run --rm dev ruff check --fix .
+| Command | Purpose |
+|---------|---------|
+| `/workflow/all` | Orchestrate full workflow with auto-detection |
+| `/1_specify` | Create feature branch and specification |
+| `/2_plan` | Generate detailed specs via speckit-author |
+| `/3_tasks` | Validate task list from plan.md |
+| `/4_implement` | Execute tasks + run quality gates |
+| `/5_integrate` | Create PRs, cleanup worktree |
+| `/6_release` | Create release (develop→main) |
+| `/7_backmerge` | Sync release to develop and contrib |
 
-# Interactive shell
-podman-compose run --rm dev bash
+### Branch Structure
+
+```
+main (production) ← develop (integration) ← contrib/stharrold (active) ← feature/*
 ```
 
-### GCP Deployment
+**PR Flow**: feature → contrib → develop → main
+
+### Quality Gates (5 gates, all must pass before PR)
 
 ```bash
-./deploy.sh --project PROJECT_ID --region REGION   # Deploy to GCP
-./test_gcp.sh           # Run GCP-specific tests
+podman-compose run --rm dev python .claude/skills/quality-enforcer/scripts/run_quality_gates.py
+```
+
+| Gate | Description |
+|------|-------------|
+| 1. Coverage | ≥80% test coverage |
+| 2. Tests | All pytest tests pass |
+| 3. Build | Build succeeds |
+| 4. Linting | `ruff check .` clean |
+| 5. AI Config Sync | CLAUDE.md → AGENTS.md synced |
+
+### Pre-commit Hooks
+
+```bash
+# Install hooks (one-time)
+uv run pre-commit install
+
+# Run manually on all files
+uv run pre-commit run --all-files
 ```
 
 ## Container Files
@@ -97,6 +131,20 @@ podman-compose run --rm dev bash
 - `iam.tf` - Service accounts and permissions
 - `variables.tf` / `outputs.tf` - Configuration
 
+### Skills System (9 skills in `.claude/skills/`)
+
+| Skill | Purpose |
+|-------|---------|
+| workflow-orchestrator | Main coordinator, templates |
+| git-workflow-manager | Worktrees, PRs, semantic versioning |
+| quality-enforcer | Quality gates (5 gates) |
+| bmad-planner | Requirements + architecture |
+| speckit-author | Specifications |
+| tech-stack-adapter | Python/uv/Podman detection |
+| workflow-utilities | Archive, directory structure |
+| agentdb-state-manager | Workflow state tracking |
+| initialize-repository | Bootstrap new repos |
+
 ## Key Patterns
 
 - **Dataclasses**: `TranscriptSegment`, `SituationSegment`, `ProcessingResult`
@@ -122,3 +170,43 @@ Tests are in `tests/` with mocked external dependencies:
 podman-compose run --rm dev pytest tests/
 podman-compose run --rm dev pytest tests/ --cov=src --cov-report=term
 ```
+
+## AI Config Sync
+
+CLAUDE.md automatically syncs to:
+- `AGENTS.md` (cross-tool compatibility)
+- `.github/copilot-instructions.md` (GitHub Copilot)
+- `.agents/` (mirrored skills)
+
+```bash
+# Manual sync
+python .claude/skills/workflow-utilities/scripts/sync_ai_config.py sync
+
+# Verify sync
+python .claude/skills/workflow-utilities/scripts/sync_ai_config.py verify
+```
+
+## Prerequisites
+
+```bash
+podman --version          # 4.0+ required
+podman-compose --version
+git --version
+python3 --version         # 3.11+
+gh --version              # GitHub CLI
+```
+
+## Critical Guidelines
+
+- **One way to run**: Always use `podman-compose run --rm dev <command>`
+- **End on editable branch**: All workflows must end on `contrib/*` (never `develop` or `main`)
+- **ALWAYS prefer editing existing files** over creating new ones
+- **Follow PR workflow sequence**: feature → contrib → develop → main
+- **Quality gates must pass** before creating any PR
+
+## Reference Documentation
+
+- `WORKFLOW.md` - Complete workflow guide
+- `ARCHITECTURE.md` - System architecture
+- `CONTRIBUTING.md` - Contribution guidelines
+- `DEPLOYMENT.md` - GCP deployment guide
