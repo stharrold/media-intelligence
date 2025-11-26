@@ -7,11 +7,11 @@ This module provides both HTTP endpoints (for Cloud Run) and event handlers
 
 import logging
 import os
-from typing import Any
 
 import functions_framework
 from flask import Flask, jsonify, request
-from google.cloud import error_reporting, logging as cloud_logging
+from google.cloud import error_reporting
+from google.cloud import logging as cloud_logging
 
 # Configure logging
 if os.getenv("ENABLE_STRUCTURED_LOGGING", "true").lower() == "true":
@@ -142,9 +142,7 @@ def process_audio():
                         "duration": round(result.duration, 2),
                         "speaker_count": result.speaker_count,
                         "overall_situation": result.overall_situation,
-                        "overall_situation_confidence": round(
-                            result.overall_situation_confidence, 2
-                        ),
+                        "overall_situation_confidence": round(result.overall_situation_confidence, 2),
                         "segment_count": len(result.transcript_segments),
                     },
                 }
@@ -345,10 +343,7 @@ def process_audio_gcs(cloud_event):
             if error_client:
                 error_client.report(result.error)
         else:
-            logger.info(
-                f"Processing complete: {result.gcs_output_uri}, "
-                f"transcript: {result.transcript_uri}"
-            )
+            logger.info(f"Processing complete: {result.gcs_output_uri}, " f"transcript: {result.transcript_uri}")
 
     except Exception as e:
         logger.error(f"Cloud Function failed: {str(e)}", exc_info=True)

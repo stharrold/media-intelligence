@@ -178,9 +178,7 @@ class SpeechClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(
-            (exceptions.ServiceUnavailable, exceptions.TooManyRequests)
-        ),
+        retry=retry_if_exception_type((exceptions.ServiceUnavailable, exceptions.TooManyRequests)),
     )
     def transcribe_gcs(
         self,
@@ -234,7 +232,7 @@ class SpeechClient:
 
         # Execute batch recognition (long-running operation)
         operation = self.client.batch_recognize(request=request)
-        logger.info(f"Waiting for transcription operation to complete...")
+        logger.info("Waiting for transcription operation to complete...")
 
         response = operation.result(timeout=3600)  # 1 hour timeout
 
@@ -321,13 +319,15 @@ class SpeechClient:
                     except ValueError:
                         pass
 
-                words_data.append({
-                    "word": word_info.word,
-                    "start_time": word_start,
-                    "end_time": word_end,
-                    "confidence": word_info.confidence,
-                    "speaker_tag": segment_speaker_tag,
-                })
+                words_data.append(
+                    {
+                        "word": word_info.word,
+                        "start_time": word_start,
+                        "end_time": word_end,
+                        "confidence": word_info.confidence,
+                        "speaker_tag": segment_speaker_tag,
+                    }
+                )
 
             # Create segment
             segment = TranscriptSegment(
@@ -346,10 +346,7 @@ class SpeechClient:
         # Calculate speaker count
         speaker_count = len(speaker_tags_seen) if speaker_tags_seen else 0
 
-        logger.info(
-            f"Transcription complete: {len(segments)} segments, "
-            f"{speaker_count} speakers, {total_duration:.1f}s duration"
-        )
+        logger.info(f"Transcription complete: {len(segments)} segments, " f"{speaker_count} speakers, {total_duration:.1f}s duration")
 
         return TranscriptionResult(
             segments=segments,
@@ -363,9 +360,7 @@ class SpeechClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(
-            (exceptions.ServiceUnavailable, exceptions.TooManyRequests)
-        ),
+        retry=retry_if_exception_type((exceptions.ServiceUnavailable, exceptions.TooManyRequests)),
     )
     def transcribe_streaming(
         self,

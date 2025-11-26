@@ -1,0 +1,47 @@
+# Copyright (c) 2025 Harrold Holdings GmbH
+# Licensed under the Apache License, Version 2.0
+# See LICENSE file in the project root for full license information.
+
+# Media Intelligence Pipeline - Development Container (Podman/OCI)
+# Python 3.11 + uv environment for development and workflow automation
+#
+# Build:  podman build -f Containerfile.dev -t media-intelligence-dev .
+# Run:    podman run --rm -v .:/app:Z media-intelligence-dev <command>
+# Shell:  podman run --rm -it -v .:/app:Z media-intelligence-dev bash
+#
+# Or with podman-compose:
+#   podman-compose run --rm dev pytest
+#   podman-compose run --rm dev uv run ruff check .
+
+FROM python:3.11-slim
+
+LABEL maintainer="stharrold"
+LABEL description="Media Intelligence development environment with uv + Python 3.11"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    ffmpeg \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+ENV UV_VERSION=0.5.5
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
+# Set working directory
+WORKDIR /app
+
+# Copy dependency files first (for layer caching)
+COPY pyproject.toml uv.lock* ./
+
+# Install dependencies (frozen if lock exists, otherwise sync)
+RUN uv sync --frozen 2>/dev/null || uv sync
+
+# Copy project files
+COPY . .
+
+# Set default command
+CMD ["bash"]

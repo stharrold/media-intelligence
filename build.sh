@@ -24,20 +24,20 @@ echo -e "${BLUE}Media Intelligence Pipeline - Build${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-# Check for container runtime
+# Check for container runtime (prefer Podman)
 if command -v podman &> /dev/null; then
     CONTAINER_CMD="podman"
     COMPOSE_CMD="podman-compose"
+    echo -e "${GREEN}Using container runtime: podman${NC}"
 elif command -v docker &> /dev/null; then
     CONTAINER_CMD="docker"
     COMPOSE_CMD="docker-compose"
+    echo -e "${YELLOW}Using container runtime: docker (podman recommended)${NC}"
 else
     echo -e "${RED}Error: Neither podman nor docker found${NC}"
-    echo "Please install podman or docker to continue."
+    echo "Please install podman: https://podman.io/docs/installation"
     exit 1
 fi
-
-echo -e "${GREEN}Using container runtime: ${CONTAINER_CMD}${NC}"
 
 # Check for compose
 if ! command -v $COMPOSE_CMD &> /dev/null; then
@@ -73,7 +73,7 @@ echo ""
 if [ "$USE_COMPOSE" = true ]; then
     $COMPOSE_CMD build
 else
-    $CONTAINER_CMD build -t media-intelligence:latest .
+    $CONTAINER_CMD build -f Containerfile -t media-intelligence:latest .
 fi
 
 # Check build result

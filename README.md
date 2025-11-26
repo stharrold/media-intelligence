@@ -273,7 +273,7 @@ Alternatively, use `--no-diarization` to skip speaker identification.
 ### Out of Memory
 
 - Use a smaller model: `./run.sh audio.wav -m tiny.en`
-- Increase container memory limit in `compose.yaml`
+- Increase container memory limit in `podman-compose.yml`
 - Process shorter audio files
 
 ### Slow Processing
@@ -292,9 +292,9 @@ ffmpeg -i input.mp4 -ac 1 -ar 16000 output.wav
 
 ### Container Build Fails
 
-- Ensure podman/docker is installed
+- Ensure podman is installed: `podman --version`
 - Check available disk space (>5GB needed)
-- Try building with `--no-cache`: `podman build --no-cache -t media-intelligence .`
+- Try building with `--no-cache`: `podman build --no-cache -f Containerfile -t media-intelligence .`
 
 ## Testing
 
@@ -317,8 +317,10 @@ media-intelligence/
 ├── README.md                   # This file
 ├── QUICKSTART.md              # 5-minute guide
 ├── IMPLEMENTATION_SUMMARY.md  # Technical design
-├── Dockerfile                 # Container build
-├── compose.yaml               # Podman/Docker Compose
+├── Containerfile              # Production container (Podman/OCI)
+├── Containerfile.dev          # Development container with uv
+├── Containerfile.gcp          # Cloud Run container
+├── podman-compose.yml         # Podman Compose orchestration
 ├── requirements.txt           # Python dependencies
 ├── .env.example              # Environment template
 ├── config.example.yaml       # Advanced config

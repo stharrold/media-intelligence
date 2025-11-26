@@ -1,0 +1,82 @@
+# Copyright (c) 2025 Harrold Holdings GmbH
+# Licensed under the Apache License, Version 2.0
+# See LICENSE file in the project root for full license information.
+
+# Media Intelligence Pipeline - Podman Compose Configuration
+# Usage:
+#   podman-compose build              # Build container
+#   podman-compose run --rm media-intelligence <audio.wav>  # Process audio
+#   podman-compose up -d              # Start in background
+#   podman-compose down               # Stop container
+
+services:
+  media-intelligence:
+    build:
+      context: .
+      dockerfile: Containerfile
+    container_name: media-intelligence
+    image: media-intelligence:latest
+
+    # Volume mounts (Z flag for SELinux compatibility)
+    volumes:
+      # Input audio files (read-only for security)
+      - ./data/input:/data/input:ro,Z
+      # Output results (read-write)
+      - ./data/output:/data/output:rw,Z
+      # Model cache (persistent across runs)
+      - ./cache:/root/.cache:rw,Z
+
+    # Environment variables
+    environment:
+      # HuggingFace token for pyannote diarization
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      # Thread limits for CPU processing
+      - OMP_NUM_THREADS=4
+      - MKL_NUM_THREADS=4
+      # Model cache location
+      - TRANSFORMERS_CACHE=/root/.cache/huggingface
+      - HF_HOME=/root/.cache/huggingface
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+    # Read-only root filesystem (with exceptions for cache/output)
+    read_only: true
+    tmpfs:
+      - /tmp:size=1G
+
+    # Network isolation (no external network needed for processing)
+    network_mode: none
+
+    # Restart policy
+    restart: "no"
+
+  # Development container with uv for workflow automation
+  dev:
+    build:
+      context: .
+      dockerfile: Containerfile.dev
+    image: media-intelligence-dev:latest
+    container_name: media-intelligence-dev
+    working_dir: /app
+    volumes:
+      - .:/app:Z
+    stdin_open: true
+    tty: true
+    command: bash
+
+# Named volumes (optional - use for persistent storage)
+# volumes:
+#   model-cache:
+#     driver: local

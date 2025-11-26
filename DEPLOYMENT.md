@@ -24,8 +24,8 @@ gcloud --version  # v400+
 # Terraform
 terraform --version  # v1.5+
 
-# Docker (for local development)
-docker --version  # v20+
+# Podman (for local development - Docker also supported)
+podman --version  # v4.0+
 
 # Python
 python --version  # v3.11+
@@ -338,11 +338,11 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 gcloud run revisions logs media-processor-00001 --region $REGION
 
 # Test locally
-docker build -t media-processor .
-docker run -p 8080:8080 \
+podman build -f Containerfile.gcp -t media-processor .
+podman run -p 8080:8080 \
     -e PROJECT_ID=$PROJECT_ID \
     -e GOOGLE_APPLICATION_CREDENTIALS=/key.json \
-    -v $(pwd)/key.json:/key.json \
+    -v $(pwd)/key.json:/key.json:Z \
     media-processor
 ```
 

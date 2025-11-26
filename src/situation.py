@@ -10,8 +10,6 @@ Uses the MIT AST model fine-tuned on AudioSet.
 """
 
 import logging
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
 import numpy as np
@@ -23,43 +21,32 @@ logger = logging.getLogger("media_intelligence.situation")
 
 # Mapping from AudioSet labels to practical situations
 SITUATION_MAPPING = {
-    "airplane": [
-        "Aircraft", "Fixed-wing aircraft", "Airplane", "Jet engine",
-        "Propeller, airscrew", "Aircraft engine", "Light aircraft"
-    ],
-    "car": [
-        "Vehicle", "Car", "Motor vehicle (road)", "Engine", "Traffic noise",
-        "Road traffic", "Car horn", "Car alarm", "Idling", "Accelerating"
-    ],
-    "walking": [
-        "Walk, footsteps", "Run", "Footsteps", "Gait", "Running",
-        "Jogging", "Shuffling"
-    ],
-    "meeting": [
-        "Speech", "Conversation", "Chatter", "Crowd", "Inside, public space",
-        "Narration, monologue", "Discussion", "Debate"
-    ],
-    "office": [
-        "Computer keyboard", "Typing", "Inside, small room", "Printer",
-        "Mouse click", "Clicking", "Mechanical fan", "Air conditioning"
-    ],
+    "airplane": ["Aircraft", "Fixed-wing aircraft", "Airplane", "Jet engine", "Propeller, airscrew", "Aircraft engine", "Light aircraft"],
+    "car": ["Vehicle", "Car", "Motor vehicle (road)", "Engine", "Traffic noise", "Road traffic", "Car horn", "Car alarm", "Idling", "Accelerating"],
+    "walking": ["Walk, footsteps", "Run", "Footsteps", "Gait", "Running", "Jogging", "Shuffling"],
+    "meeting": ["Speech", "Conversation", "Chatter", "Crowd", "Inside, public space", "Narration, monologue", "Discussion", "Debate"],
+    "office": ["Computer keyboard", "Typing", "Inside, small room", "Printer", "Mouse click", "Clicking", "Mechanical fan", "Air conditioning"],
     "outdoor": [
-        "Wind", "Rain", "Bird", "Outside, urban or manmade", "Outside, rural or natural",
-        "Wind noise (microphone)", "Rustling leaves", "Rain on surface",
-        "Thunder", "Thunderstorm", "Water", "Stream", "River"
+        "Wind",
+        "Rain",
+        "Bird",
+        "Outside, urban or manmade",
+        "Outside, rural or natural",
+        "Wind noise (microphone)",
+        "Rustling leaves",
+        "Rain on surface",
+        "Thunder",
+        "Thunderstorm",
+        "Water",
+        "Stream",
+        "River",
     ],
-    "restaurant": [
-        "Dishes, pots, and pans", "Cutlery, silverware", "Restaurant",
-        "Clinking", "Clanging", "Chopping (food)", "Sizzle", "Frying (food)"
-    ],
-    "quiet": [
-        "Silence", "Inside, small room", "Quiet", "Ambient",
-        "White noise", "Pink noise", "Room tone"
-    ],
+    "restaurant": ["Dishes, pots, and pans", "Cutlery, silverware", "Restaurant", "Clinking", "Clanging", "Chopping (food)", "Sizzle", "Frying (food)"],
+    "quiet": ["Silence", "Inside, small room", "Quiet", "Ambient", "White noise", "Pink noise", "Room tone"],
 }
 
 # Reverse mapping: AudioSet label -> situation
-LABEL_TO_SITUATION: Dict[str, str] = {}
+LABEL_TO_SITUATION: dict[str, str] = {}
 for situation, labels in SITUATION_MAPPING.items():
     for label in labels:
         LABEL_TO_SITUATION[label.lower()] = situation
@@ -68,6 +55,7 @@ for situation, labels in SITUATION_MAPPING.items():
 @dataclass
 class SituationConfig:
     """Configuration for situation classification."""
+
     model: str = "MIT/ast-finetuned-audioset-10-10-0.4593"
     segment_duration: float = 30.0
     confidence_threshold: float = 0.3
@@ -87,7 +75,7 @@ class SituationClassifier:
         feature_extractor: Audio feature extractor
     """
 
-    def __init__(self, config: Optional[SituationConfig] = None):
+    def __init__(self, config: SituationConfig | None = None):
         """
         Initialize the classifier.
 
@@ -102,17 +90,13 @@ class SituationClassifier:
 
     def _load_model(self) -> None:
         """Load the AST model and feature extractor."""
-        from transformers import AutoFeatureExtractor, ASTForAudioClassification
         import torch
+        from transformers import ASTForAudioClassification, AutoFeatureExtractor
 
         logger.info(f"Loading AST model: {self.config.model}")
 
-        self.feature_extractor = AutoFeatureExtractor.from_pretrained(
-            self.config.model
-        )
-        self.model = ASTForAudioClassification.from_pretrained(
-            self.config.model
-        )
+        self.feature_extractor = AutoFeatureExtractor.from_pretrained(self.config.model)
+        self.model = ASTForAudioClassification.from_pretrained(self.config.model)
 
         # Move to device
         device = torch.device(self.config.device)
@@ -128,7 +112,7 @@ class SituationClassifier:
         self,
         audio: np.ndarray,
         sample_rate: int = 16000,
-    ) -> Tuple[str, float, List[Dict[str, float]]]:
+    ) -> tuple[str, float, list[dict[str, float]]]:
         """
         Classify a single audio segment.
 
@@ -159,12 +143,7 @@ class SituationClassifier:
             audio = audio.mean(axis=0)
 
         # Extract features
-        inputs = self.feature_extractor(
-            audio,
-            sampling_rate=sample_rate,
-            return_tensors="pt",
-            padding=True
-        )
+        inputs = self.feature_extractor(audio, sampling_rate=sample_rate, return_tensors="pt", padding=True)
 
         # Move to device
         device = next(self.model.parameters()).device
@@ -183,12 +162,9 @@ class SituationClassifier:
         top_probs, top_indices = torch.topk(probs, top_k)
 
         top_predictions = []
-        for prob, idx in zip(top_probs.tolist(), top_indices.tolist()):
+        for prob, idx in zip(top_probs.tolist(), top_indices.tolist(), strict=True):
             label = self.id2label[idx]
-            top_predictions.append({
-                "label": label,
-                "confidence": prob
-            })
+            top_predictions.append({"label": label, "confidence": prob})
 
         # Map to situation
         situation = self._map_to_situation(top_predictions)
@@ -196,10 +172,7 @@ class SituationClassifier:
 
         return situation, confidence, top_predictions
 
-    def _map_to_situation(
-        self,
-        predictions: List[Dict[str, float]]
-    ) -> str:
+    def _map_to_situation(self, predictions: list[dict[str, float]]) -> str:
         """
         Map AudioSet predictions to a practical situation.
 
@@ -212,7 +185,7 @@ class SituationClassifier:
             Mapped situation category
         """
         # Accumulate scores for each situation
-        situation_scores: Dict[str, float] = {}
+        situation_scores: dict[str, float] = {}
 
         for pred in predictions:
             label = pred["label"].lower()
@@ -238,8 +211,8 @@ class SituationClassifier:
         self,
         audio: np.ndarray,
         sample_rate: int = 16000,
-        segment_duration: Optional[float] = None,
-    ) -> Tuple[List[SituationSegment], str]:
+        segment_duration: float | None = None,
+    ) -> tuple[list[SituationSegment], str]:
         """
         Classify full audio with sliding windows.
 
@@ -254,7 +227,6 @@ class SituationClassifier:
         segment_duration = segment_duration or self.config.segment_duration
         segment_samples = int(segment_duration * sample_rate)
 
-        duration = len(audio) / sample_rate
         segments = []
 
         # Process in windows
@@ -270,34 +242,28 @@ class SituationClassifier:
             start_time = start_sample / sample_rate
             end_time = end_sample / sample_rate
 
-            situation, confidence, top_preds = self.classify_segment(
-                segment_audio, sample_rate
-            )
+            situation, confidence, top_preds = self.classify_segment(segment_audio, sample_rate)
 
-            segments.append(SituationSegment(
-                start=start_time,
-                end=end_time,
-                situation=situation,
-                confidence=confidence,
-                top_predictions=top_preds[:5]  # Keep top 5
-            ))
+            segments.append(
+                SituationSegment(
+                    start=start_time,
+                    end=end_time,
+                    situation=situation,
+                    confidence=confidence,
+                    top_predictions=top_preds[:5],  # Keep top 5
+                )
+            )
 
             start_sample = end_sample
 
         # Determine overall situation by voting
         overall_situation = self._determine_overall_situation(segments)
 
-        logger.info(
-            f"Situation classification complete: {len(segments)} segments, "
-            f"overall={overall_situation}"
-        )
+        logger.info(f"Situation classification complete: {len(segments)} segments, " f"overall={overall_situation}")
 
         return segments, overall_situation
 
-    def _determine_overall_situation(
-        self,
-        segments: List[SituationSegment]
-    ) -> str:
+    def _determine_overall_situation(self, segments: list[SituationSegment]) -> str:
         """
         Determine overall situation from segment classifications.
 
@@ -313,7 +279,7 @@ class SituationClassifier:
             return "unknown"
 
         # Weighted voting
-        situation_weights: Dict[str, float] = {}
+        situation_weights: dict[str, float] = {}
 
         for seg in segments:
             duration = seg.end - seg.start
@@ -326,7 +292,7 @@ class SituationClassifier:
         return max(situation_weights.items(), key=lambda x: x[1])[0]
 
     @staticmethod
-    def get_available_situations() -> List[str]:
+    def get_available_situations() -> list[str]:
         """
         Get list of available situation categories.
 
@@ -336,7 +302,7 @@ class SituationClassifier:
         return list(SITUATION_MAPPING.keys())
 
     @staticmethod
-    def get_situation_labels(situation: str) -> List[str]:
+    def get_situation_labels(situation: str) -> list[str]:
         """
         Get AudioSet labels associated with a situation.
 

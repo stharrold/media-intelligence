@@ -4,7 +4,6 @@ These tests require GCP credentials and actual GCP resources.
 Run with: pytest tests/test_integration.py -v --integration
 """
 
-import json
 import os
 import uuid
 

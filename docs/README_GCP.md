@@ -58,7 +58,7 @@ media-intelligence-gcp/
 ├── DEPLOYMENT.md              # Full deployment guide
 │
 ├── requirements.txt           # Python dependencies
-├── Dockerfile                 # Container image
+├── Containerfile.gcp          # Cloud Run container (OCI)
 ├── cloudbuild.yaml           # Cloud Build CI/CD
 │
 ├── terraform/                 # Infrastructure as Code

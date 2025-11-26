@@ -73,8 +73,8 @@ echo ""
 
 # Test 1: Check required files
 echo -e "${BLUE}Checking required files...${NC}"
-run_test "Dockerfile exists" "[ -f Dockerfile ]"
-run_test "compose.yaml exists" "[ -f compose.yaml ]"
+run_test "Containerfile exists" "[ -f Containerfile ]"
+run_test "podman-compose.yml exists" "[ -f podman-compose.yml ]"
 run_test "requirements.txt exists" "[ -f requirements.txt ]"
 run_test "Source files exist" "[ -d src ] && [ -f src/process_audio.py ]"
 run_test ".env.example exists" "[ -f .env.example ]"
