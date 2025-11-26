@@ -6,7 +6,7 @@ import logging
 import math
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -65,7 +65,7 @@ def generate_file_id() -> str:
     Returns:
         Unique file ID string.
     """
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     unique_id = uuid.uuid4().hex[:8]
     return f"{timestamp}_{unique_id}"
 
@@ -249,10 +249,7 @@ def validate_audio_duration(
     max_seconds = max_duration_minutes * 60
 
     if duration_seconds > max_seconds:
-        raise ValueError(
-            f"Audio duration ({duration_seconds / 60:.1f} minutes) exceeds "
-            f"maximum allowed duration ({max_duration_minutes} minutes)"
-        )
+        raise ValueError(f"Audio duration ({duration_seconds / 60:.1f} minutes) exceeds " f"maximum allowed duration ({max_duration_minutes} minutes)")
 
 
 def get_situation_color(situation: str) -> str:

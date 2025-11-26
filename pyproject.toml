@@ -3,7 +3,7 @@
 
 [project]
 name = "media-intelligence"
-version = "1.0.0"
+version = "0.1.0"
 description = "Containerized audio processing system for extracting structured intelligence from recorded media"
 requires-python = ">=3.11"
 dependencies = [

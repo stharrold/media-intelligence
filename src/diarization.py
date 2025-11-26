@@ -11,8 +11,6 @@ Requires a HuggingFace token with access to pyannote models.
 
 import logging
 import os
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
 import numpy as np
@@ -25,9 +23,10 @@ logger = logging.getLogger("media_intelligence.diarization")
 @dataclass
 class DiarizationConfig:
     """Configuration for speaker diarization."""
+
     pipeline: str = "pyannote/speaker-diarization-3.1"
-    min_speakers: Optional[int] = None
-    max_speakers: Optional[int] = None
+    min_speakers: int | None = None
+    max_speakers: int | None = None
     device: str = "cpu"
 
 
@@ -56,11 +55,7 @@ class Diarizer:
         hf_token: HuggingFace authentication token
     """
 
-    def __init__(
-        self,
-        config: Optional[DiarizationConfig] = None,
-        hf_token: Optional[str] = None
-    ):
+    def __init__(self, config: DiarizationConfig | None = None, hf_token: str | None = None):
         """
         Initialize the diarizer.
 
@@ -90,15 +85,12 @@ class Diarizer:
 
     def _load_pipeline(self) -> None:
         """Load the pyannote diarization pipeline."""
-        from pyannote.audio import Pipeline
         import torch
+        from pyannote.audio import Pipeline
 
         logger.info(f"Loading diarization pipeline: {self.config.pipeline}")
 
-        self.pipeline = Pipeline.from_pretrained(
-            self.config.pipeline,
-            use_auth_token=self.hf_token
-        )
+        self.pipeline = Pipeline.from_pretrained(self.config.pipeline, use_auth_token=self.hf_token)
 
         # Move to appropriate device
         if self.config.device == "cpu":
@@ -112,9 +104,9 @@ class Diarizer:
         self,
         audio: np.ndarray,
         sample_rate: int = 16000,
-        min_speakers: Optional[int] = None,
-        max_speakers: Optional[int] = None,
-    ) -> List[SpeakerSegment]:
+        min_speakers: int | None = None,
+        max_speakers: int | None = None,
+    ) -> list[SpeakerSegment]:
         """
         Perform speaker diarization on audio.
 
@@ -139,10 +131,7 @@ class Diarizer:
         min_speakers = min_speakers or self.config.min_speakers
         max_speakers = max_speakers or self.config.max_speakers
 
-        logger.debug(
-            f"Diarizing {len(audio)/sample_rate:.2f}s of audio "
-            f"(min_speakers={min_speakers}, max_speakers={max_speakers})"
-        )
+        logger.debug(f"Diarizing {len(audio)/sample_rate:.2f}s of audio " f"(min_speakers={min_speakers}, max_speakers={max_speakers})")
 
         # Prepare audio tensor
         if audio.dtype != np.float32:
@@ -155,10 +144,7 @@ class Diarizer:
         waveform = torch.from_numpy(audio).unsqueeze(0)
 
         # Create audio dict for pyannote
-        audio_dict = {
-            "waveform": waveform,
-            "sample_rate": sample_rate
-        }
+        audio_dict = {"waveform": waveform, "sample_rate": sample_rate}
 
         # Build kwargs for pipeline
         kwargs = {}
@@ -173,28 +159,21 @@ class Diarizer:
         # Convert to SpeakerSegment list
         segments = []
         for turn, _, speaker in diarization.itertracks(yield_label=True):
-            segments.append(SpeakerSegment(
-                start=turn.start,
-                end=turn.end,
-                speaker=speaker
-            ))
+            segments.append(SpeakerSegment(start=turn.start, end=turn.end, speaker=speaker))
 
         # Sort by start time
         segments.sort(key=lambda x: x.start)
 
-        logger.info(
-            f"Diarization complete: {len(segments)} turns, "
-            f"{len(set(s.speaker for s in segments))} speakers"
-        )
+        logger.info(f"Diarization complete: {len(segments)} turns, " f"{len(set(s.speaker for s in segments))} speakers")
 
         return segments
 
     def diarize_file(
         self,
         file_path: str,
-        min_speakers: Optional[int] = None,
-        max_speakers: Optional[int] = None,
-    ) -> List[SpeakerSegment]:
+        min_speakers: int | None = None,
+        max_speakers: int | None = None,
+    ) -> list[SpeakerSegment]:
         """
         Diarize an audio file.
 
@@ -213,10 +192,8 @@ class Diarizer:
 
 
 def assign_speakers_to_segments(
-    transcript_segments: List[TranscriptSegment],
-    speaker_segments: List[SpeakerSegment],
-    overlap_threshold: float = 0.5
-) -> List[TranscriptSegment]:
+    transcript_segments: list[TranscriptSegment], speaker_segments: list[SpeakerSegment], overlap_threshold: float = 0.5
+) -> list[TranscriptSegment]:
     """
     Assign speaker labels to transcript segments based on diarization.
 
@@ -265,7 +242,7 @@ def assign_speakers_to_segments(
     return transcript_segments
 
 
-def get_speaker_statistics(segments: List[TranscriptSegment]) -> Dict[str, float]:
+def get_speaker_statistics(segments: list[TranscriptSegment]) -> dict[str, float]:
     """
     Calculate speaking time statistics for each speaker.
 
@@ -275,7 +252,7 @@ def get_speaker_statistics(segments: List[TranscriptSegment]) -> Dict[str, float
     Returns:
         Dict mapping speaker ID to total speaking time in seconds
     """
-    stats: Dict[str, float] = {}
+    stats: dict[str, float] = {}
 
     for seg in segments:
         speaker = seg.speaker or "UNKNOWN"

@@ -9,20 +9,18 @@ Provides common functions for audio loading, file handling, logging,
 and output generation.
 """
 
+import json
 import logging
-import os
 import sys
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple, Union
-import json
+from typing import Any
 
 import numpy as np
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
-from rich.panel import Panel
 
 # Initialize rich console
 console = Console()
@@ -32,7 +30,7 @@ SUPPORTED_FORMATS = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".opus"}
 
 # Memory thresholds (in bytes)
 MEMORY_WARNING_THRESHOLD = 4 * 1024 * 1024 * 1024  # 4GB
-MEMORY_ERROR_THRESHOLD = 8 * 1024 * 1024 * 1024    # 8GB
+MEMORY_ERROR_THRESHOLD = 8 * 1024 * 1024 * 1024  # 8GB
 
 
 def check_available_memory() -> int:
@@ -44,6 +42,7 @@ def check_available_memory() -> int:
     """
     try:
         import psutil
+
         return psutil.virtual_memory().available
     except ImportError:
         # psutil not available, return a large value to skip check
@@ -63,15 +62,15 @@ def estimate_memory_requirement(file_size_bytes: int, model_size: str = "base.en
     """
     # Base memory requirements per model (approximate)
     model_memory = {
-        "tiny": 1 * 1024 * 1024 * 1024,      # 1GB
+        "tiny": 1 * 1024 * 1024 * 1024,  # 1GB
         "tiny.en": 1 * 1024 * 1024 * 1024,
-        "base": 1.5 * 1024 * 1024 * 1024,    # 1.5GB
+        "base": 1.5 * 1024 * 1024 * 1024,  # 1.5GB
         "base.en": 1.5 * 1024 * 1024 * 1024,
-        "small": 2 * 1024 * 1024 * 1024,     # 2GB
+        "small": 2 * 1024 * 1024 * 1024,  # 2GB
         "small.en": 2 * 1024 * 1024 * 1024,
-        "medium": 5 * 1024 * 1024 * 1024,    # 5GB
+        "medium": 5 * 1024 * 1024 * 1024,  # 5GB
         "medium.en": 5 * 1024 * 1024 * 1024,
-        "large-v2": 10 * 1024 * 1024 * 1024, # 10GB
+        "large-v2": 10 * 1024 * 1024 * 1024,  # 10GB
         "large-v3": 10 * 1024 * 1024 * 1024,
     }
 
@@ -86,10 +85,7 @@ def estimate_memory_requirement(file_size_bytes: int, model_size: str = "base.en
     return int(base_model_mem + pipeline_overhead + audio_overhead)
 
 
-def validate_memory_for_file(
-    file_path: Union[str, Path],
-    model_size: str = "base.en"
-) -> Tuple[bool, str]:
+def validate_memory_for_file(file_path: str | Path, model_size: str = "base.en") -> tuple[bool, str]:
     """
     Validate that sufficient memory is available to process a file.
 
@@ -116,15 +112,12 @@ def validate_memory_for_file(
         )
 
     if available_mem < MEMORY_WARNING_THRESHOLD:
-        return True, (
-            f"Warning: Low available memory ({available_mem / (1024**3):.1f}GB). "
-            f"Processing may be slow or fail for large files."
-        )
+        return True, (f"Warning: Low available memory ({available_mem / (1024**3):.1f}GB). " f"Processing may be slow or fail for large files.")
 
     return True, ""
 
 
-def setup_logging(level: str = "INFO", log_file: Optional[str] = None) -> logging.Logger:
+def setup_logging(level: str = "INFO", log_file: str | None = None) -> logging.Logger:
     """
     Configure logging for the pipeline.
 
@@ -138,10 +131,7 @@ def setup_logging(level: str = "INFO", log_file: Optional[str] = None) -> loggin
     log_level = getattr(logging, level.upper(), logging.INFO)
 
     # Create formatter
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
     # Configure root logger
     logger = logging.getLogger("media_intelligence")
@@ -167,11 +157,7 @@ def setup_logging(level: str = "INFO", log_file: Optional[str] = None) -> loggin
     return logger
 
 
-def load_audio(
-    file_path: Union[str, Path],
-    target_sr: int = 16000,
-    mono: bool = True
-) -> Tuple[np.ndarray, int]:
+def load_audio(file_path: str | Path, target_sr: int = 16000, mono: bool = True) -> tuple[np.ndarray, int]:
     """
     Load and preprocess audio file.
 
@@ -195,22 +181,15 @@ def load_audio(
         raise FileNotFoundError(f"Audio file not found: {file_path}")
 
     if file_path.suffix.lower() not in SUPPORTED_FORMATS:
-        raise ValueError(
-            f"Unsupported audio format: {file_path.suffix}. "
-            f"Supported formats: {', '.join(SUPPORTED_FORMATS)}"
-        )
+        raise ValueError(f"Unsupported audio format: {file_path.suffix}. " f"Supported formats: {', '.join(SUPPORTED_FORMATS)}")
 
     # Load audio with librosa
-    audio, sr = librosa.load(
-        str(file_path),
-        sr=target_sr,
-        mono=mono
-    )
+    audio, sr = librosa.load(str(file_path), sr=target_sr, mono=mono)
 
     return audio, sr
 
 
-def get_audio_duration(file_path: Union[str, Path]) -> float:
+def get_audio_duration(file_path: str | Path) -> float:
     """
     Get duration of audio file in seconds.
 
@@ -226,7 +205,7 @@ def get_audio_duration(file_path: Union[str, Path]) -> float:
     return duration
 
 
-def validate_audio_file(file_path: Union[str, Path]) -> bool:
+def validate_audio_file(file_path: str | Path) -> bool:
     """
     Validate that a file is a supported audio format.
 
@@ -237,14 +216,10 @@ def validate_audio_file(file_path: Union[str, Path]) -> bool:
         True if valid audio file, False otherwise
     """
     file_path = Path(file_path)
-    return (
-        file_path.exists() and
-        file_path.is_file() and
-        file_path.suffix.lower() in SUPPORTED_FORMATS
-    )
+    return file_path.exists() and file_path.is_file() and file_path.suffix.lower() in SUPPORTED_FORMATS
 
 
-def find_audio_files(directory: Union[str, Path]) -> List[Path]:
+def find_audio_files(directory: str | Path) -> list[Path]:
     """
     Find all audio files in a directory.
 
@@ -264,7 +239,7 @@ def find_audio_files(directory: Union[str, Path]) -> List[Path]:
     return sorted(audio_files)
 
 
-def sanitize_path(path: Union[str, Path]) -> Path:
+def sanitize_path(path: str | Path) -> Path:
     """
     Sanitize and validate a file path.
 
@@ -291,13 +266,14 @@ def sanitize_path(path: Union[str, Path]) -> Path:
 @dataclass
 class TranscriptSegment:
     """Represents a segment of transcribed audio."""
+
     start: float
     end: float
     text: str
-    speaker: Optional[str] = None
+    speaker: str | None = None
     confidence: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)
 
@@ -305,13 +281,14 @@ class TranscriptSegment:
 @dataclass
 class SituationSegment:
     """Represents a classified situation/scene segment."""
+
     start: float
     end: float
     situation: str
     confidence: float
-    top_predictions: List[Dict[str, float]] = field(default_factory=list)
+    top_predictions: list[dict[str, float]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)
 
@@ -319,15 +296,16 @@ class SituationSegment:
 @dataclass
 class ProcessingResult:
     """Complete processing result for an audio file."""
+
     file_path: str
     duration: float
-    transcript_segments: List[TranscriptSegment]
-    situation_segments: List[SituationSegment]
+    transcript_segments: list[TranscriptSegment]
+    situation_segments: list[SituationSegment]
     overall_situation: str
     processing_time: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "file_path": self.file_path,
@@ -344,10 +322,7 @@ class ProcessingResult:
         return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
 
 
-def save_json_output(
-    result: ProcessingResult,
-    output_path: Union[str, Path]
-) -> Path:
+def save_json_output(result: ProcessingResult, output_path: str | Path) -> Path:
     """
     Save processing result as JSON.
 
@@ -367,10 +342,7 @@ def save_json_output(
     return output_path
 
 
-def save_transcript_output(
-    result: ProcessingResult,
-    output_path: Union[str, Path]
-) -> Path:
+def save_transcript_output(result: ProcessingResult, output_path: str | Path) -> Path:
     """
     Save human-readable transcript.
 
@@ -396,9 +368,7 @@ def save_transcript_output(
 
     for segment in result.transcript_segments:
         speaker = segment.speaker or "UNKNOWN"
-        lines.append(
-            f"[{segment.start:.2f}s - {segment.end:.2f}s] {speaker}: {segment.text}"
-        )
+        lines.append(f"[{segment.start:.2f}s - {segment.end:.2f}s] {speaker}: {segment.text}")
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
@@ -406,10 +376,7 @@ def save_transcript_output(
     return output_path
 
 
-def save_situations_output(
-    result: ProcessingResult,
-    output_path: Union[str, Path]
-) -> Path:
+def save_situations_output(result: ProcessingResult, output_path: str | Path) -> Path:
     """
     Save situation analysis report.
 
@@ -432,10 +399,7 @@ def save_situations_output(
     ]
 
     for segment in result.situation_segments:
-        lines.append(
-            f"[{segment.start:.1f}s - {segment.end:.1f}s] "
-            f"{segment.situation.upper()} (confidence: {segment.confidence:.3f})"
-        )
+        lines.append(f"[{segment.start:.1f}s - {segment.end:.1f}s] " f"{segment.situation.upper()} (confidence: {segment.confidence:.3f})")
         lines.append("  Top predictions:")
         for pred in segment.top_predictions[:3]:
             lines.append(f"    - {pred['label']}: {pred['confidence']:.3f}")
@@ -480,10 +444,7 @@ def print_results_table(result: ProcessingResult) -> None:
     table.add_row("Processing Time", f"{result.processing_time:.2f}s")
     table.add_row("RTF", f"{rtf:.3f}")
     table.add_row("Segments", str(len(result.transcript_segments)))
-    table.add_row(
-        "Speakers",
-        str(result.metadata.get("num_speakers", "N/A"))
-    )
+    table.add_row("Speakers", str(result.metadata.get("num_speakers", "N/A")))
     table.add_row("Overall Situation", result.overall_situation)
 
     console.print(table)
@@ -517,7 +478,7 @@ def format_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
 
 
-def get_file_info(file_path: Union[str, Path]) -> Dict[str, Any]:
+def get_file_info(file_path: str | Path) -> dict[str, Any]:
     """
     Get metadata about an audio file.
 
