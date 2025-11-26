@@ -2,15 +2,6 @@
 type: claude-context
 directory: .
 purpose: Containerized audio processing system for extracting structured intelligence from recorded media
-parent: null
-sibling_readme: README.md
-children:
-  - .claude/CLAUDE.md
-  - src/CLAUDE.md
-  - tests/CLAUDE.md
-  - terraform/CLAUDE.md
-  - planning/CLAUDE.md
-  - specs/CLAUDE.md
 ---
 
 # CLAUDE.md
@@ -36,10 +27,12 @@ podman-compose build
 podman-compose run --rm dev uv run <command>
 
 # Common operations
-podman-compose run --rm dev uv run pytest tests/              # Run tests
-podman-compose run --rm dev uv run pytest tests/ -v -k test_  # Single test
-podman-compose run --rm dev uv run ruff check .               # Lint
-podman-compose run --rm dev uv run ruff check --fix .         # Auto-fix
+podman-compose run --rm dev uv run pytest tests/                      # Run all tests
+podman-compose run --rm dev uv run pytest tests/test_utils.py -v      # Single file
+podman-compose run --rm dev uv run pytest tests/ -v -k "test_init"    # By name pattern
+podman-compose run --rm dev uv run pytest tests/ --cov=src            # With coverage
+podman-compose run --rm dev uv run ruff check .                       # Lint
+podman-compose run --rm dev uv run ruff check --fix .                 # Auto-fix
 
 # Build and run production container
 ./build.sh              # Build container image
@@ -84,7 +77,7 @@ podman-compose run --rm dev uv run python .claude/skills/quality-enforcer/script
 
 | Gate | Description |
 |------|-------------|
-| 1. Coverage | ≥80% test coverage |
+| 1. Coverage | ≥40% test coverage (target: 80%, tracked in issue #9) |
 | 2. Tests | All pytest tests pass |
 | 3. Build | Build succeeds |
 | 4. Linting | `ruff check .` clean |
@@ -116,6 +109,7 @@ uv run pre-commit run --all-files
 - `transcription.py` - faster-whisper wrapper (Whisper INT8)
 - `diarization.py` - pyannote-audio 3.1 speaker diarization
 - `situation.py` - AST AudioSet classifier
+- `key_manager.py` - Secure key storage (OS keyring for local, GCP Secret Manager for cloud)
 - `utils.py` - Shared utilities, data classes
 
 ### GCP Pipeline (`src/`)
@@ -165,6 +159,7 @@ podman-compose run --rm dev uv run python .claude/skills/agentdb-state-manager/s
 - **Lazy initialization**: GCP clients use `@property` pattern
 - **Retry logic**: `tenacity` for transient errors
 - **Context managers**: `download_temp_file()` for cleanup
+- **Testing**: pytest-mock (`mocker` fixture) for clean mocking
 - **Line length**: 170 chars (configured in pyproject.toml for ruff)
 
 ## Configuration

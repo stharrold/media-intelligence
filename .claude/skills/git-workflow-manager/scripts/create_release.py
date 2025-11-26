@@ -52,7 +52,7 @@ def validate_version_format(version):
         ValueError: If version doesn't match vX.Y.Z pattern
     """
     if not re.match(VERSION_PATTERN, version):
-        raise ValueError(f"Invalid version format '{version}'. " f"Must match pattern vX.Y.Z (e.g., v1.1.0, v2.0.0)")
+        raise ValueError(f"Invalid version format '{version}'. Must match pattern vX.Y.Z (e.g., v1.1.0, v2.0.0)")
 
 
 def check_working_directory_clean():
@@ -66,7 +66,7 @@ def check_working_directory_clean():
         result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, check=True)
 
         if result.stdout.strip():
-            raise RuntimeError("Working directory has uncommitted changes. " "Please commit or stash changes before creating release branch.")
+            raise RuntimeError("Working directory has uncommitted changes. Please commit or stash changes before creating release branch.")
 
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Failed to check git status: {e.stderr.strip()}") from e
@@ -85,7 +85,7 @@ def verify_branch_exists(branch_name):
     try:
         subprocess.run(["git", "rev-parse", "--verify", branch_name], capture_output=True, check=True)
     except subprocess.CalledProcessError:
-        raise ValueError(f"Base branch '{branch_name}' does not exist. " f"Use 'git branch -a' to list available branches.")
+        raise ValueError(f"Base branch '{branch_name}' does not exist. Use 'git branch -a' to list available branches.")
 
 
 def verify_tag_not_exists(version):
@@ -102,7 +102,7 @@ def verify_tag_not_exists(version):
         result = subprocess.run(["git", "tag", "-l", version], capture_output=True, text=True, check=True)
 
         if result.stdout.strip():
-            raise ValueError(f"Tag '{version}' already exists. " f"Use 'git tag -l' to list existing tags.")
+            raise ValueError(f"Tag '{version}' already exists. Use 'git tag -l' to list existing tags.")
 
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Failed to check git tags: {e.stderr.strip()}") from e
