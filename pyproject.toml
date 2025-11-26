@@ -49,6 +49,10 @@ dependencies = [
     "tenacity>=8.2.3",
     "requests>=2.31.0",
 
+    # Key Management
+    "keyring>=25.0.0",
+    "google-cloud-kms>=2.21.0",
+
     # Workflow system dependencies
     "click>=8.1.0",
     "httpx>=0.27.0",

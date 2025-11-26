@@ -4,21 +4,21 @@
 
 """
 Tests for the AudioProcessor class (GCP deployment).
-"""
 
-from unittest.mock import MagicMock, patch
+Uses pytest-mock for clean, readable mocking.
+"""
 
 
 class TestAudioProcessor:
     """Tests for the GCP AudioProcessor class."""
 
-    @patch("src.audio_processor.StorageManager")
-    @patch("src.audio_processor.SpeechClient")
-    @patch("src.audio_processor.SituationClassifier")
-    @patch("src.audio_processor.load_config")
-    def test_initialization(self, mock_config, mock_classifier, mock_speech, mock_storage):
+    def test_initialization(self, mocker):
         """Test AudioProcessor initialization."""
-        from src.audio_processor import AudioProcessor
+        # Setup mocks using pytest-mock
+        mocker.patch("src.audio_processor.StorageManager")
+        mocker.patch("src.audio_processor.SpeechClient")
+        mocker.patch("src.audio_processor.SituationClassifier")
+        mock_config = mocker.patch("src.audio_processor.load_config")
 
         mock_config.return_value = {
             "project_id": "test-project",
@@ -26,18 +26,19 @@ class TestAudioProcessor:
             "output_bucket": "test-output",
         }
 
+        from src.audio_processor import AudioProcessor
+
         processor = AudioProcessor()
 
         assert processor is not None
         mock_config.assert_called_once()
 
-    @patch("src.audio_processor.StorageManager")
-    @patch("src.audio_processor.SpeechClient")
-    @patch("src.audio_processor.SituationClassifier")
-    @patch("src.audio_processor.load_config")
-    def test_initialization_with_custom_config(self, mock_config, mock_classifier, mock_speech, mock_storage):
+    def test_initialization_with_custom_config(self, mocker):
         """Test AudioProcessor initialization with custom config."""
-        from src.audio_processor import AudioProcessor
+        mocker.patch("src.audio_processor.StorageManager")
+        mocker.patch("src.audio_processor.SpeechClient")
+        mocker.patch("src.audio_processor.SituationClassifier")
+        mock_config = mocker.patch("src.audio_processor.load_config")
 
         custom_config = {
             "project_id": "custom-project",
@@ -48,18 +49,19 @@ class TestAudioProcessor:
         }
         mock_config.return_value = custom_config
 
+        from src.audio_processor import AudioProcessor
+
         processor = AudioProcessor()
 
         assert processor.config == custom_config
 
-    @patch("src.audio_processor.StorageManager")
-    @patch("src.audio_processor.SpeechClient")
-    @patch("src.audio_processor.SituationClassifier")
-    @patch("src.audio_processor.load_config")
-    @patch("src.audio_processor.is_supported_format")
-    def test_process_file_unsupported_format(self, mock_supported, mock_config, mock_classifier, mock_speech, mock_storage):
+    def test_process_file_unsupported_format(self, mocker):
         """Test processing rejects unsupported format."""
-        from src.audio_processor import AudioProcessor
+        mocker.patch("src.audio_processor.StorageManager")
+        mocker.patch("src.audio_processor.SpeechClient")
+        mocker.patch("src.audio_processor.SituationClassifier")
+        mock_config = mocker.patch("src.audio_processor.load_config")
+        mock_supported = mocker.patch("src.audio_processor.is_supported_format")
 
         mock_config.return_value = {
             "project_id": "test-project",
@@ -69,35 +71,30 @@ class TestAudioProcessor:
         }
         mock_supported.return_value = False
 
+        from src.audio_processor import AudioProcessor
+
         processor = AudioProcessor()
         result = processor.process_file(gcs_uri="gs://bucket/file.txt", output_bucket="test-output")
 
         assert result.error is not None
         assert "Unsupported" in result.error or "unsupported" in result.error.lower()
 
-    @patch("src.audio_processor.StorageManager")
-    @patch("src.audio_processor.SpeechClient")
-    @patch("src.audio_processor.SituationClassifier")
-    @patch("src.audio_processor.load_config")
-    @patch("src.audio_processor.is_supported_format")
-    @patch("src.audio_processor.get_audio_duration")
-    @patch("src.audio_processor.validate_audio_duration")
-    def test_process_file_success(
-        self,
-        mock_validate,
-        mock_duration,
-        mock_supported,
-        mock_config,
-        mock_classifier_class,
-        mock_speech_class,
-        mock_storage_class,
-    ):
+    def test_process_file_success(self, mocker):
         """Test successful file processing."""
+        # Setup all mocks
+        mock_storage_class = mocker.patch("src.audio_processor.StorageManager")
+        mock_speech_class = mocker.patch("src.audio_processor.SpeechClient")
+        mock_classifier_class = mocker.patch("src.audio_processor.SituationClassifier")
+        mock_config = mocker.patch("src.audio_processor.load_config")
+        mock_supported = mocker.patch("src.audio_processor.is_supported_format")
+        mock_duration = mocker.patch("src.audio_processor.get_audio_duration")
+        mock_validate = mocker.patch("src.audio_processor.validate_audio_duration")
+
         from src.audio_processor import AudioProcessor
         from src.situation_classifier import SituationPrediction, SituationResult
         from src.speech_client import TranscriptionResult, TranscriptSegment
 
-        # Setup mocks
+        # Configure mocks
         mock_config.return_value = {
             "project_id": "test-project",
             "input_bucket": "test-input",
@@ -110,15 +107,15 @@ class TestAudioProcessor:
         mock_validate.return_value = True
 
         # Mock storage manager
-        mock_storage = MagicMock()
-        mock_storage.download_temp_file.return_value.__enter__ = MagicMock(return_value="/tmp/audio.wav")
-        mock_storage.download_temp_file.return_value.__exit__ = MagicMock(return_value=False)
+        mock_storage = mocker.MagicMock()
+        mock_storage.download_temp_file.return_value.__enter__ = mocker.MagicMock(return_value="/tmp/audio.wav")
+        mock_storage.download_temp_file.return_value.__exit__ = mocker.MagicMock(return_value=False)
         mock_storage.upload_json.return_value = "gs://test-output/results/test.json"
         mock_storage.upload_text.return_value = "gs://test-output/transcripts/test.txt"
         mock_storage_class.return_value = mock_storage
 
         # Mock speech client
-        mock_speech = MagicMock()
+        mock_speech = mocker.MagicMock()
         mock_speech.transcribe_gcs.return_value = TranscriptionResult(
             segments=[
                 TranscriptSegment(
@@ -137,7 +134,7 @@ class TestAudioProcessor:
         mock_speech_class.return_value = mock_speech
 
         # Mock situation classifier
-        mock_classifier = MagicMock()
+        mock_classifier = mocker.MagicMock()
         mock_classifier.classify_audio.return_value = SituationResult(
             predictions=[
                 SituationPrediction(

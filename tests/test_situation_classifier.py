@@ -1,6 +1,8 @@
-"""Tests for the Situation Classifier."""
+"""
+Tests for the Situation Classifier.
 
-from unittest.mock import Mock, patch
+Uses pytest-mock for clean, readable mocking.
+"""
 
 import pytest
 
@@ -20,23 +22,24 @@ def mock_classifier():
 
 
 @pytest.fixture
-def classifier_with_endpoint():
+def classifier_with_endpoint(mocker):
     """Create a classifier with mocked Vertex AI endpoint."""
-    with patch("src.situation_classifier.aiplatform") as _mock_aiplatform:  # noqa: F841
-        classifier = SituationClassifier(
-            project_id="test-project",
-            endpoint_id="test-endpoint",
-            location="us-central1",
-        )
+    mocker.patch("src.situation_classifier.aiplatform")
 
-        # Mock endpoint
-        mock_endpoint = Mock()
-        mock_prediction = Mock()
-        mock_prediction.predictions = [{"confidences": {"meeting": 0.8, "office": 0.15, "quiet": 0.05}}]
-        mock_endpoint.predict.return_value = mock_prediction
+    classifier = SituationClassifier(
+        project_id="test-project",
+        endpoint_id="test-endpoint",
+        location="us-central1",
+    )
 
-        classifier._endpoint = mock_endpoint
-        return classifier
+    # Mock endpoint using pytest-mock
+    mock_endpoint = mocker.MagicMock()
+    mock_prediction = mocker.MagicMock()
+    mock_prediction.predictions = [{"confidences": {"meeting": 0.8, "office": 0.15, "quiet": 0.05}}]
+    mock_endpoint.predict.return_value = mock_prediction
+
+    classifier._endpoint = mock_endpoint
+    return classifier
 
 
 class TestSituationClassifier:
