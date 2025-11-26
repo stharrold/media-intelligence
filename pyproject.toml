@@ -24,7 +24,7 @@ dependencies = [
     "google-cloud-storage>=2.10.0",
     "google-cloud-pubsub>=2.18.4",
     "google-cloud-logging>=3.8.0",
-    "google-cloud-error-reporting>=1.9.3",
+    "google-cloud-error-reporting>=1.10.0",
     "google-cloud-firestore>=2.13.1",
     "google-cloud-aiplatform>=1.38.1",
 
@@ -84,6 +84,12 @@ ignore = ["E402"]
 "tests/**/*.py" = ["N999"]
 
 [tool.uv]
+# Exclude problematic transitive dependencies without ARM64 Linux wheels
+# torchcodec is pulled by torch but not required for our use case
+constraint-dependencies = [
+    "torchcodec<0.0.1",  # Effectively exclude - no ARM64 Linux wheels
+]
+
 dev-dependencies = [
     "pre-commit>=4.0.0",
     "pytest>=8.0.0",

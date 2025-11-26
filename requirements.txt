@@ -26,7 +26,7 @@ google-cloud-speech==2.21.0
 google-cloud-storage==2.10.0
 google-cloud-pubsub==2.18.4
 google-cloud-logging==3.8.0
-google-cloud-error-reporting==1.9.3
+google-cloud-error-reporting>=1.10.0
 google-cloud-firestore==2.13.1
 
 # Vertex AI (for custom situation classifier)
