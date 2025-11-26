@@ -1,6 +1,7 @@
-# Media Intelligence Pipeline - Cloud Run Container
-# Build: docker build -t media-processor .
-# Run: docker run -p 8080:8080 media-processor
+# Media Intelligence Pipeline - Cloud Run Container (Podman/OCI)
+# Build: podman build -f Containerfile.gcp -t media-processor .
+# Run:   podman run -p 8080:8080 media-processor
+# Note: Also compatible with Docker and GCP Cloud Build
 
 FROM python:3.11-slim
 

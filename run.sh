@@ -19,7 +19,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Check for container runtime
+# Check for container runtime (prefer Podman)
 if command -v podman &> /dev/null; then
     CONTAINER_CMD="podman"
     COMPOSE_CMD="podman-compose"
@@ -28,6 +28,7 @@ elif command -v docker &> /dev/null; then
     COMPOSE_CMD="docker-compose"
 else
     echo -e "${RED}Error: Neither podman nor docker found${NC}"
+    echo "Please install podman: https://podman.io/docs/installation"
     exit 1
 fi
 

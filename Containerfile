@@ -2,8 +2,10 @@
 # Licensed under the Apache License, Version 2.0
 # See LICENSE file in the project root for full license information.
 
-# Media Intelligence Pipeline - Dockerfile
+# Media Intelligence Pipeline - Containerfile (Podman/OCI)
 # Multi-stage build for optimized image size
+# Build: podman build -t media-intelligence:latest .
+# Run:   podman run --rm media-intelligence:latest --help
 
 # =============================================================================
 # Stage 1: Builder - Install dependencies and download models

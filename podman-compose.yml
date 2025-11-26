@@ -2,27 +2,29 @@
 # Licensed under the Apache License, Version 2.0
 # See LICENSE file in the project root for full license information.
 
-# Media Intelligence Pipeline - Compose Configuration
-# Compatible with Podman Compose and Docker Compose
-
-version: '3.8'
+# Media Intelligence Pipeline - Podman Compose Configuration
+# Usage:
+#   podman-compose build              # Build container
+#   podman-compose run --rm media-intelligence <audio.wav>  # Process audio
+#   podman-compose up -d              # Start in background
+#   podman-compose down               # Stop container
 
 services:
   media-intelligence:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Containerfile
     container_name: media-intelligence
     image: media-intelligence:latest
 
-    # Volume mounts
+    # Volume mounts (Z flag for SELinux compatibility)
     volumes:
       # Input audio files (read-only for security)
-      - ./data/input:/data/input:ro
+      - ./data/input:/data/input:ro,Z
       # Output results (read-write)
-      - ./data/output:/data/output:rw
+      - ./data/output:/data/output:rw,Z
       # Model cache (persistent across runs)
-      - ./cache:/root/.cache:rw
+      - ./cache:/root/.cache:rw,Z
 
     # Environment variables
     environment:
@@ -59,6 +61,20 @@ services:
 
     # Restart policy
     restart: "no"
+
+  # Development container with uv for workflow automation
+  dev:
+    build:
+      context: .
+      dockerfile: Containerfile.dev
+    image: media-intelligence-dev:latest
+    container_name: media-intelligence-dev
+    working_dir: /app
+    volumes:
+      - .:/app:Z
+    stdin_open: true
+    tty: true
+    command: bash
 
 # Named volumes (optional - use for persistent storage)
 # volumes:

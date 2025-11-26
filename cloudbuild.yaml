@@ -22,11 +22,13 @@ steps:
         pip install pytest pytest-mock
         python -m pytest tests/ -v --ignore=tests/test_integration.py
 
-  # Step 2: Build the container image
+  # Step 2: Build the container image (uses Containerfile - OCI compatible)
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build'
     args:
       - 'build'
+      - '-f'
+      - 'Containerfile'
       - '-t'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/media-processor/${_SERVICE_NAME}:${SHORT_SHA}'
       - '-t'

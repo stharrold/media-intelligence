@@ -9,21 +9,71 @@ Media Intelligence Pipeline: A containerized audio processing system for extract
 - **Local**: CPU-only containerized pipeline (air-gapped deployment ready)
 - **GCP**: Cloud-native pipeline using Google Cloud managed services
 
+## Container Runtime
+
+This project uses **Podman** as the primary container runtime (OCI-compatible).
+
+### Prerequisites
+
+```bash
+podman --version          # 4.0+ required
+podman-compose --version  # For compose operations
+```
+
 ## Build and Test Commands
 
-### Local Deployment
+### Local Deployment (Podman)
+
 ```bash
+# Build and run (wrapper scripts auto-detect podman/docker)
 ./build.sh              # Build container image
 ./run.sh <audio.wav>    # Process audio file
 ./test.sh               # Run validation tests
-pytest tests/           # Run unit tests
+
+# Direct Podman commands
+podman build -f Containerfile -t media-intelligence:latest .
+podman run --rm -v ./data/input:/data/input:ro,Z \
+    -v ./data/output:/data/output:rw,Z \
+    media-intelligence:latest <audio.wav>
+
+# Podman Compose
+podman-compose build
+podman-compose run --rm media-intelligence <audio.wav>
+```
+
+### Development Container
+
+```bash
+# Build development container (with uv)
+podman build -f Containerfile.dev -t media-intelligence-dev .
+
+# Run tests in container
+podman-compose run --rm dev pytest tests/
+podman-compose run --rm dev pytest tests/ -v -k test_transcription
+
+# Run linting
+podman-compose run --rm dev ruff check .
+podman-compose run --rm dev ruff check --fix .
+
+# Interactive shell
+podman-compose run --rm dev bash
 ```
 
 ### GCP Deployment
+
 ```bash
 ./deploy.sh --project PROJECT_ID --region REGION   # Deploy to GCP
 ./test_gcp.sh           # Run GCP-specific tests
 ```
+
+## Container Files
+
+| File | Purpose |
+|------|---------|
+| `Containerfile` | Production container (multi-stage build) |
+| `Containerfile.dev` | Development container with uv |
+| `Containerfile.gcp` | Cloud Run optimized container |
+| `podman-compose.yml` | Container orchestration |
 
 ## Architecture
 
@@ -66,3 +116,9 @@ Tests are in `tests/` with mocked external dependencies:
 - `test_transcription.py`, `test_diarization.py`, `test_situation.py` - Local
 - `test_speech_client.py`, `test_situation_classifier.py`, `test_storage_manager.py`, `test_audio_processor.py` - GCP
 - `test_integration.py`, `test_gcp_integration.py` - End-to-end
+
+```bash
+# Run tests
+podman-compose run --rm dev pytest tests/
+podman-compose run --rm dev pytest tests/ --cov=src --cov-report=term
+```
