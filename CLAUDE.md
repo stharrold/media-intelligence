@@ -24,7 +24,7 @@ Media Intelligence Pipeline: A containerized audio processing system for extract
 - **Local**: CPU-only containerized pipeline (air-gapped deployment ready)
 - **GCP**: Cloud-native pipeline using Google Cloud managed services
 
-**Key Principle**: All development uses `podman-compose run --rm dev <command>`. One way to run everything.
+**Key Principle**: All development uses `podman-compose run --rm dev uv run <command>`. One way to run everything.
 
 ## Essential Commands
 
@@ -33,13 +33,13 @@ Media Intelligence Pipeline: A containerized audio processing system for extract
 podman-compose build
 
 # Run any command (containerized - preferred)
-podman-compose run --rm dev <command>
+podman-compose run --rm dev uv run <command>
 
 # Common operations
-podman-compose run --rm dev pytest tests/              # Run tests
-podman-compose run --rm dev pytest tests/ -v -k test_  # Single test
-podman-compose run --rm dev ruff check .               # Lint
-podman-compose run --rm dev ruff check --fix .         # Auto-fix
+podman-compose run --rm dev uv run pytest tests/              # Run tests
+podman-compose run --rm dev uv run pytest tests/ -v -k test_  # Single test
+podman-compose run --rm dev uv run ruff check .               # Lint
+podman-compose run --rm dev uv run ruff check --fix .         # Auto-fix
 
 # Build and run production container
 ./build.sh              # Build container image
@@ -79,7 +79,7 @@ main (production) ← develop (integration) ← contrib/stharrold (active) ← f
 ### Quality Gates (5 gates, all must pass before PR)
 
 ```bash
-podman-compose run --rm dev python .claude/skills/quality-enforcer/scripts/run_quality_gates.py
+podman-compose run --rm dev uv run python .claude/skills/quality-enforcer/scripts/run_quality_gates.py
 ```
 
 | Gate | Description |
@@ -142,8 +142,22 @@ uv run pre-commit run --all-files
 | speckit-author | Specifications |
 | tech-stack-adapter | Python/uv/Podman detection |
 | workflow-utilities | Archive, directory structure |
-| agentdb-state-manager | Workflow state tracking |
+| agentdb-state-manager | Workflow state tracking (DuckDB) |
 | initialize-repository | Bootstrap new repos |
+
+### AgentDB (Workflow State)
+
+```bash
+# Initialize database (start of session)
+podman-compose run --rm dev uv run python .claude/skills/agentdb-state-manager/scripts/init_database.py
+
+# Record workflow transition
+podman-compose run --rm dev uv run python .claude/skills/agentdb-state-manager/scripts/record_sync.py \
+  --sync-type workflow_transition --pattern phase_1_specify
+
+# Query current workflow state
+podman-compose run --rm dev uv run python .claude/skills/agentdb-state-manager/scripts/query_workflow_state.py --format json
+```
 
 ## Key Patterns
 
@@ -151,6 +165,7 @@ uv run pre-commit run --all-files
 - **Lazy initialization**: GCP clients use `@property` pattern
 - **Retry logic**: `tenacity` for transient errors
 - **Context managers**: `download_temp_file()` for cleanup
+- **Line length**: 170 chars (configured in pyproject.toml for ruff)
 
 ## Configuration
 
@@ -167,8 +182,8 @@ Tests are in `tests/` with mocked external dependencies:
 
 ```bash
 # Run tests
-podman-compose run --rm dev pytest tests/
-podman-compose run --rm dev pytest tests/ --cov=src --cov-report=term
+podman-compose run --rm dev uv run pytest tests/
+podman-compose run --rm dev uv run pytest tests/ --cov=src --cov-report=term
 ```
 
 ## AI Config Sync
@@ -180,33 +195,16 @@ CLAUDE.md automatically syncs to:
 
 ```bash
 # Manual sync
-python .claude/skills/workflow-utilities/scripts/sync_ai_config.py sync
+podman-compose run --rm dev uv run python .claude/skills/workflow-utilities/scripts/sync_ai_config.py sync
 
 # Verify sync
-python .claude/skills/workflow-utilities/scripts/sync_ai_config.py verify
-```
-
-## Prerequisites
-
-```bash
-podman --version          # 4.0+ required
-podman-compose --version
-git --version
-python3 --version         # 3.11+
-gh --version              # GitHub CLI
+podman-compose run --rm dev uv run python .claude/skills/workflow-utilities/scripts/sync_ai_config.py verify
 ```
 
 ## Critical Guidelines
 
-- **One way to run**: Always use `podman-compose run --rm dev <command>`
+- **One way to run**: Always use `podman-compose run --rm dev uv run <command>`
 - **End on editable branch**: All workflows must end on `contrib/*` (never `develop` or `main`)
 - **ALWAYS prefer editing existing files** over creating new ones
 - **Follow PR workflow sequence**: feature → contrib → develop → main
 - **Quality gates must pass** before creating any PR
-
-## Reference Documentation
-
-- `WORKFLOW.md` - Complete workflow guide
-- `ARCHITECTURE.md` - System architecture
-- `CONTRIBUTING.md` - Contribution guidelines
-- `DEPLOYMENT.md` - GCP deployment guide
