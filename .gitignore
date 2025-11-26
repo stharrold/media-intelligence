@@ -226,3 +226,8 @@ Thumbs.db
 test_output/
 output/
 results/
+coverage.json
+
+# AgentDB state (generated at runtime)
+.claude-state/agentdb.duckdb
+.claude-state/agentdb.duckdb.wal

@@ -10,8 +10,6 @@ word-level timestamps, and voice activity detection filtering.
 """
 
 import logging
-from pathlib import Path
-from typing import List, Optional, Tuple, Iterator, Any
 from dataclasses import dataclass
 
 import numpy as np
@@ -24,11 +22,12 @@ logger = logging.getLogger("media_intelligence.transcription")
 @dataclass
 class WhisperConfig:
     """Configuration for Whisper transcription."""
+
     model_size: str = "base.en"
     device: str = "cpu"
     compute_type: str = "int8"
     beam_size: int = 5
-    language: Optional[str] = "en"
+    language: str | None = "en"
     word_timestamps: bool = True
     vad_filter: bool = True
     vad_min_silence_duration_ms: int = 500
@@ -47,12 +46,9 @@ class Transcriber:
     """
 
     # Valid Whisper model sizes
-    VALID_MODELS = {
-        "tiny", "tiny.en", "base", "base.en", "small", "small.en",
-        "medium", "medium.en", "large-v2", "large-v3"
-    }
+    VALID_MODELS = {"tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large-v2", "large-v3"}
 
-    def __init__(self, config: Optional[WhisperConfig] = None):
+    def __init__(self, config: WhisperConfig | None = None):
         """
         Initialize the transcriber.
 
@@ -67,10 +63,7 @@ class Transcriber:
 
         # Validate model name at initialization
         if self.config.model_size not in self.VALID_MODELS:
-            raise ValueError(
-                f"Invalid Whisper model: '{self.config.model_size}'. "
-                f"Valid models: {', '.join(sorted(self.VALID_MODELS))}"
-            )
+            raise ValueError(f"Invalid Whisper model: '{self.config.model_size}'. " f"Valid models: {', '.join(sorted(self.VALID_MODELS))}")
 
         self._load_model()
 
@@ -78,10 +71,7 @@ class Transcriber:
         """Load the faster-whisper model."""
         from faster_whisper import WhisperModel
 
-        logger.info(
-            f"Loading Whisper model: {self.config.model_size} "
-            f"(device={self.config.device}, compute_type={self.config.compute_type})"
-        )
+        logger.info(f"Loading Whisper model: {self.config.model_size} " f"(device={self.config.device}, compute_type={self.config.compute_type})")
 
         self.model = WhisperModel(
             self.config.model_size,
@@ -96,9 +86,9 @@ class Transcriber:
         self,
         audio: np.ndarray,
         sample_rate: int = 16000,
-        language: Optional[str] = None,
-        beam_size: Optional[int] = None,
-    ) -> Tuple[List[TranscriptSegment], dict]:
+        language: str | None = None,
+        beam_size: int | None = None,
+    ) -> tuple[list[TranscriptSegment], dict]:
         """
         Transcribe audio to text.
 
@@ -130,10 +120,7 @@ class Transcriber:
         if language == "auto":
             language = None
 
-        logger.debug(
-            f"Transcribing {len(audio)/sample_rate:.2f}s of audio "
-            f"(language={language}, beam_size={beam_size})"
-        )
+        logger.debug(f"Transcribing {len(audio)/sample_rate:.2f}s of audio " f"(language={language}, beam_size={beam_size})")
 
         # Run transcription
         segments_gen, info = self.model.transcribe(
@@ -142,9 +129,7 @@ class Transcriber:
             beam_size=beam_size,
             word_timestamps=self.config.word_timestamps,
             vad_filter=self.config.vad_filter,
-            vad_parameters=dict(
-                min_silence_duration_ms=self.config.vad_min_silence_duration_ms
-            ),
+            vad_parameters=dict(min_silence_duration_ms=self.config.vad_min_silence_duration_ms),
         )
 
         # Convert generator to list of segments
@@ -165,19 +150,16 @@ class Transcriber:
             "duration": info.duration,
         }
 
-        logger.info(
-            f"Transcription complete: {len(segments)} segments, "
-            f"language={info.language} (prob={info.language_probability:.2f})"
-        )
+        logger.info(f"Transcription complete: {len(segments)} segments, " f"language={info.language} (prob={info.language_probability:.2f})")
 
         return segments, metadata
 
     def transcribe_file(
         self,
         file_path: str,
-        language: Optional[str] = None,
-        beam_size: Optional[int] = None,
-    ) -> Tuple[List[TranscriptSegment], dict]:
+        language: str | None = None,
+        beam_size: int | None = None,
+    ) -> tuple[list[TranscriptSegment], dict]:
         """
         Transcribe an audio file.
 
@@ -195,7 +177,7 @@ class Transcriber:
         return self.transcribe(audio, sr, language, beam_size)
 
     @staticmethod
-    def get_available_models() -> List[str]:
+    def get_available_models() -> list[str]:
         """
         Get list of available Whisper model sizes.
 

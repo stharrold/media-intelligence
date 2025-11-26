@@ -9,9 +9,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from .situation_classifier import SituationClassifier, SituationPrediction, SituationResult
-from .speech_client import SpeechClient, TranscriptSegment, TranscriptionResult
-from .storage_manager import StorageManager
 from .gcp_utils import (
     estimate_cost,
     format_timestamp,
@@ -22,6 +19,9 @@ from .gcp_utils import (
     load_config,
     validate_audio_duration,
 )
+from .situation_classifier import SituationClassifier, SituationPrediction, SituationResult
+from .speech_client import SpeechClient, TranscriptionResult, TranscriptSegment
+from .storage_manager import StorageManager
 
 logger = logging.getLogger(__name__)
 
@@ -188,29 +188,21 @@ class AudioProcessor:
             duration = self._get_duration(gcs_uri)
 
             # Validate duration
-            max_duration = processing_config.get("processing", {}).get(
-                "max_duration_minutes", 480
-            )
+            max_duration = processing_config.get("processing", {}).get("max_duration_minutes", 480)
             validate_audio_duration(duration, max_duration)
 
             # Run transcription
             transcription_result = self._transcribe(gcs_uri, processing_config)
 
             # Run situation classification
-            situation_result = self._classify_situations(
-                gcs_uri, duration, processing_config
-            )
+            situation_result = self._classify_situations(gcs_uri, duration, processing_config)
 
             # Calculate cost estimate
             cost = estimate_cost(
                 duration,
                 self.config,
-                enable_diarization=processing_config.get("speech", {})
-                .get("diarization", {})
-                .get("enabled", True),
-                enable_situation_detection=processing_config.get("situation", {}).get(
-                    "enabled", True
-                ),
+                enable_diarization=processing_config.get("speech", {}).get("diarization", {}).get("enabled", True),
+                enable_situation_detection=processing_config.get("situation", {}).get("enabled", True),
             )
 
             # Build result
@@ -283,14 +275,10 @@ class AudioProcessor:
             merged.setdefault("speech", {})["model"] = overrides["model"]
 
         if "min_speakers" in overrides:
-            merged.setdefault("speech", {}).setdefault("diarization", {})[
-                "min_speaker_count"
-            ] = overrides["min_speakers"]
+            merged.setdefault("speech", {}).setdefault("diarization", {})["min_speaker_count"] = overrides["min_speakers"]
 
         if "max_speakers" in overrides:
-            merged.setdefault("speech", {}).setdefault("diarization", {})[
-                "max_speaker_count"
-            ] = overrides["max_speakers"]
+            merged.setdefault("speech", {}).setdefault("diarization", {})["max_speaker_count"] = overrides["max_speakers"]
 
         return merged
 
@@ -308,15 +296,11 @@ class AudioProcessor:
 
     def _get_duration(self, gcs_uri: str) -> float:
         """Get audio duration, downloading if necessary."""
-        with tempfile.NamedTemporaryFile(
-            suffix=f".{get_file_extension(gcs_uri)}", delete=True
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=f".{get_file_extension(gcs_uri)}", delete=True) as tmp:
             local_path = self.storage_manager.download_file(gcs_uri, tmp.name)
             return get_audio_duration(local_path)
 
-    def _transcribe(
-        self, gcs_uri: str, config: dict[str, Any]
-    ) -> TranscriptionResult:
+    def _transcribe(self, gcs_uri: str, config: dict[str, Any]) -> TranscriptionResult:
         """Run transcription."""
         speech_config = config.get("speech", {})
         diarization_config = speech_config.get("diarization", {})
@@ -330,9 +314,7 @@ class AudioProcessor:
             max_speaker_count=diarization_config.get("max_speaker_count", 6),
         )
 
-    def _classify_situations(
-        self, gcs_uri: str, duration: float, config: dict[str, Any]
-    ) -> SituationResult:
+    def _classify_situations(self, gcs_uri: str, duration: float, config: dict[str, Any]) -> SituationResult:
         """Run situation classification."""
         situation_config = config.get("situation", {})
 
@@ -367,12 +349,8 @@ class AudioProcessor:
             "processed_at": datetime.utcnow().isoformat(),
             "model_used": transcription_result.model_used,
             "language_code": transcription_result.language_code,
-            "diarization_enabled": config.get("speech", {})
-            .get("diarization", {})
-            .get("enabled", True),
-            "situation_classification_enabled": config.get("situation", {}).get(
-                "enabled", True
-            ),
+            "diarization_enabled": config.get("speech", {}).get("diarization", {}).get("enabled", True),
+            "situation_classification_enabled": config.get("situation", {}).get("enabled", True),
             "segment_duration": situation_result.segment_duration,
         }
 

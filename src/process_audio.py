@@ -22,36 +22,30 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional
 
 from dotenv import load_dotenv
 
+from .diarization import DiarizationConfig, Diarizer
+from .situation import SituationClassifier, SituationConfig
+from .transcription import Transcriber, WhisperConfig
 from .utils import (
+    SUPPORTED_FORMATS,
     ProcessingResult,
-    TranscriptSegment,
-    SituationSegment,
-    load_audio,
+    console,
     find_audio_files,
-    validate_audio_file,
-    validate_memory_for_file,
-    sanitize_path,
-    get_audio_duration,
-    save_json_output,
-    save_transcript_output,
-    save_situations_output,
+    load_audio,
+    print_error,
+    print_results_table,
     print_step,
     print_success,
-    print_error,
     print_warning,
-    print_results_table,
-    create_progress,
+    sanitize_path,
+    save_json_output,
+    save_situations_output,
+    save_transcript_output,
     setup_logging,
-    console,
-    SUPPORTED_FORMATS,
+    validate_memory_for_file,
 )
-from .transcription import Transcriber, WhisperConfig
-from .diarization import Diarizer, DiarizationConfig, assign_speakers_to_segments
-from .situation import SituationClassifier, SituationConfig
 
 # Load environment variables
 load_dotenv()
@@ -79,10 +73,10 @@ class AudioProcessor:
         device: str = "cpu",
         compute_type: str = "int8",
         num_workers: int = 4,
-        hf_token: Optional[str] = None,
+        hf_token: str | None = None,
         enable_diarization: bool = True,
         enable_situation: bool = True,
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
     ):
         """
         Initialize the audio processor.
@@ -129,10 +123,7 @@ class AudioProcessor:
                 logger.warning(f"Failed to initialize diarization: {e}")
                 print_warning(f"Diarization disabled: {e}")
         elif enable_diarization and not self.hf_token:
-            print_warning(
-                "Speaker diarization disabled: No HuggingFace token provided.\n"
-                "Set HUGGINGFACE_TOKEN environment variable to enable."
-            )
+            print_warning("Speaker diarization disabled: No HuggingFace token provided.\n" "Set HUGGINGFACE_TOKEN environment variable to enable.")
 
         # Initialize situation classifier (optional)
         self.classifier = None
@@ -177,10 +168,7 @@ class AudioProcessor:
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
         if audio_path.suffix.lower() not in SUPPORTED_FORMATS:
-            raise ValueError(
-                f"Unsupported format: {audio_path.suffix}. "
-                f"Supported: {', '.join(SUPPORTED_FORMATS)}"
-            )
+            raise ValueError(f"Unsupported format: {audio_path.suffix}. " f"Supported: {', '.join(SUPPORTED_FORMATS)}")
 
         # Validate memory requirements
         mem_valid, mem_msg = validate_memory_for_file(audio_path, self.whisper_model)
@@ -195,10 +183,7 @@ class AudioProcessor:
         # Helper function to check timeout
         def check_timeout():
             if self.timeout and (time.time() - start_time) > self.timeout:
-                raise TimeoutError(
-                    f"Processing timeout after {self.timeout}s. "
-                    f"Consider using a smaller model or shorter audio files."
-                )
+                raise TimeoutError(f"Processing timeout after {self.timeout}s. " f"Consider using a smaller model or shorter audio files.")
 
         console.print(f"\nProcessing: [bold]{audio_path.name}[/bold]")
 
@@ -212,9 +197,7 @@ class AudioProcessor:
         current_step = 1
 
         print_step(current_step, total_steps, "Transcribing audio...")
-        transcript_segments, trans_metadata = self.transcriber.transcribe(
-            audio, sr, language=language, beam_size=beam_size
-        )
+        transcript_segments, trans_metadata = self.transcriber.transcribe(audio, sr, language=language, beam_size=beam_size)
         console.print(f"  Found {len(transcript_segments)} segments")
         check_timeout()
 
@@ -226,6 +209,7 @@ class AudioProcessor:
             print_step(current_step, total_steps, "Identifying speakers...")
             try:
                 from .diarization import assign_speakers_to_segments as assign_speakers
+
                 speaker_segments = self.diarizer.diarize(audio, sr)
                 transcript_segments = assign_speakers(transcript_segments, speaker_segments)
                 num_speakers = len(set(s.speaker for s in speaker_segments))
@@ -266,7 +250,7 @@ class AudioProcessor:
                 "num_speakers": num_speakers,
                 "model": self.transcriber.config.model_size,
                 "compute_type": self.transcriber.config.compute_type,
-            }
+            },
         )
 
         # Step N: Save outputs
@@ -300,7 +284,7 @@ class AudioProcessor:
         output_dir: str,
         language: str = "en",
         beam_size: int = 5,
-    ) -> List[ProcessingResult]:
+    ) -> list[ProcessingResult]:
         """
         Process all audio files in a directory.
 
@@ -326,16 +310,14 @@ class AudioProcessor:
         for i, audio_path in enumerate(audio_files, 1):
             console.print(f"\n[bold]File {i}/{len(audio_files)}[/bold]")
             try:
-                result = self.process_file(
-                    str(audio_path), output_dir, language, beam_size
-                )
+                result = self.process_file(str(audio_path), output_dir, language, beam_size)
                 results.append(result)
             except Exception as e:
                 print_error(f"Failed to process {audio_path.name}: {e}")
                 logger.exception(f"Failed to process {audio_path}")
 
         # Print summary
-        console.print(f"\n[bold]Batch Processing Complete[/bold]")
+        console.print("\n[bold]Batch Processing Complete[/bold]")
         console.print(f"Processed: {len(results)}/{len(audio_files)} files")
 
         return results
@@ -359,82 +341,29 @@ Examples:
 
   Disable diarization:
     python -m src.process_audio recording.wav --no-diarization
-        """
+        """,
     )
 
+    parser.add_argument("input", help="Input audio file or directory")
+    parser.add_argument("-o", "--output", default="/data/output", help="Output directory (default: /data/output)")
     parser.add_argument(
-        "input",
-        help="Input audio file or directory"
-    )
-    parser.add_argument(
-        "-o", "--output",
-        default="/data/output",
-        help="Output directory (default: /data/output)"
-    )
-    parser.add_argument(
-        "-m", "--model",
+        "-m",
+        "--model",
         default="base.en",
         choices=["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en"],
-        help="Whisper model size (default: base.en)"
+        help="Whisper model size (default: base.en)",
     )
-    parser.add_argument(
-        "-d", "--device",
-        default="cpu",
-        choices=["cpu", "cuda"],
-        help="Processing device (default: cpu)"
-    )
-    parser.add_argument(
-        "-c", "--compute-type",
-        default="int8",
-        choices=["int8", "float16", "float32"],
-        help="Compute type (default: int8)"
-    )
-    parser.add_argument(
-        "--hf-token",
-        help="HuggingFace token for pyannote (or set HUGGINGFACE_TOKEN env var)"
-    )
-    parser.add_argument(
-        "-w", "--workers",
-        type=int,
-        default=4,
-        help="Number of CPU workers (default: 4)"
-    )
-    parser.add_argument(
-        "-l", "--language",
-        default="en",
-        help="Language code (default: en, use 'auto' for detection)"
-    )
-    parser.add_argument(
-        "-b", "--beam-size",
-        type=int,
-        default=5,
-        help="Beam size for decoding (default: 5)"
-    )
-    parser.add_argument(
-        "--no-diarization",
-        action="store_true",
-        help="Disable speaker diarization"
-    )
-    parser.add_argument(
-        "--no-situation",
-        action="store_true",
-        help="Disable situation classification"
-    )
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Enable verbose logging"
-    )
-    parser.add_argument(
-        "--log-file",
-        help="Write logs to file"
-    )
-    parser.add_argument(
-        "--timeout",
-        type=int,
-        default=None,
-        help="Processing timeout in seconds (default: no limit)"
-    )
+    parser.add_argument("-d", "--device", default="cpu", choices=["cpu", "cuda"], help="Processing device (default: cpu)")
+    parser.add_argument("-c", "--compute-type", default="int8", choices=["int8", "float16", "float32"], help="Compute type (default: int8)")
+    parser.add_argument("--hf-token", help="HuggingFace token for pyannote (or set HUGGINGFACE_TOKEN env var)")
+    parser.add_argument("-w", "--workers", type=int, default=4, help="Number of CPU workers (default: 4)")
+    parser.add_argument("-l", "--language", default="en", help="Language code (default: en, use 'auto' for detection)")
+    parser.add_argument("-b", "--beam-size", type=int, default=5, help="Beam size for decoding (default: 5)")
+    parser.add_argument("--no-diarization", action="store_true", help="Disable speaker diarization")
+    parser.add_argument("--no-situation", action="store_true", help="Disable situation classification")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
+    parser.add_argument("--log-file", help="Write logs to file")
+    parser.add_argument("--timeout", type=int, default=None, help="Processing timeout in seconds (default: no limit)")
 
     return parser.parse_args()
 
@@ -468,20 +397,10 @@ def main() -> int:
 
         if input_path.is_file():
             # Process single file
-            processor.process_file(
-                str(input_path),
-                args.output,
-                args.language,
-                args.beam_size
-            )
+            processor.process_file(str(input_path), args.output, args.language, args.beam_size)
         elif input_path.is_dir():
             # Process directory
-            processor.process_directory(
-                str(input_path),
-                args.output,
-                args.language,
-                args.beam_size
-            )
+            processor.process_directory(str(input_path), args.output, args.language, args.beam_size)
         else:
             print_error(f"Input not found: {args.input}")
             return 1

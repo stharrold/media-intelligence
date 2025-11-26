@@ -121,17 +121,13 @@ class SituationClassifier:
         """Lazy initialization of Vertex AI endpoint."""
         if self._endpoint is None and self.endpoint_id:
             self._initialize()
-            self._endpoint = aiplatform.Endpoint(
-                endpoint_name=f"projects/{self.project_id}/locations/{self.location}/endpoints/{self.endpoint_id}"
-            )
+            self._endpoint = aiplatform.Endpoint(endpoint_name=f"projects/{self.project_id}/locations/{self.location}/endpoints/{self.endpoint_id}")
         return self._endpoint
 
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(
-            (exceptions.ServiceUnavailable, exceptions.TooManyRequests)
-        ),
+        retry=retry_if_exception_type((exceptions.ServiceUnavailable, exceptions.TooManyRequests)),
     )
     def classify_audio(
         self,
@@ -178,10 +174,7 @@ class SituationClassifier:
         # Calculate overall situation
         overall_situation, overall_confidence = self._aggregate_predictions(predictions)
 
-        logger.info(
-            f"Classification complete: {len(predictions)} segments, "
-            f"overall situation: {overall_situation} ({overall_confidence:.2f})"
-        )
+        logger.info(f"Classification complete: {len(predictions)} segments, " f"overall situation: {overall_situation} ({overall_confidence:.2f})")
 
         return SituationResult(
             predictions=predictions,
@@ -225,7 +218,7 @@ class SituationClassifier:
             if isinstance(prediction, dict):
                 scores = prediction.get("confidences", prediction.get("scores", {}))
                 if isinstance(scores, list):
-                    scores = dict(zip(self.labels, scores))
+                    scores = dict(zip(self.labels, scores, strict=True))
             else:
                 scores = {self.labels[0]: 1.0}
 

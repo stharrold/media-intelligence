@@ -46,7 +46,7 @@ def create_worktree(workflow_type, slug, base_branch, create_todo=False):
     """
     # Input validation
     if workflow_type not in VALID_WORKFLOW_TYPES:
-        raise ValueError(f"Invalid workflow_type '{workflow_type}'. " f"Must be one of: {', '.join(VALID_WORKFLOW_TYPES)}")
+        raise ValueError(f"Invalid workflow_type '{workflow_type}'. Must be one of: {', '.join(VALID_WORKFLOW_TYPES)}")
 
     if not slug or not slug.replace("-", "").replace("_", "").isalnum():
         raise ValueError(f"Invalid slug '{slug}'. Must contain only letters, numbers, hyphens, and underscores.")
@@ -85,7 +85,7 @@ def create_worktree(workflow_type, slug, base_branch, create_todo=False):
 
     # Check if worktree path already exists
     if worktree_path.exists():
-        raise FileExistsError(f"Worktree path already exists: {worktree_path}\n" f"Remove it first with: git worktree remove {worktree_path}")
+        raise FileExistsError(f"Worktree path already exists: {worktree_path}\nRemove it first with: git worktree remove {worktree_path}")
 
     # Create worktree
     try:
@@ -113,7 +113,7 @@ def create_worktree(workflow_type, slug, base_branch, create_todo=False):
 
         # Check if TODO file already exists
         if todo_path.exists():
-            print(f"WARNING: TODO file already exists: {todo_filename}\n" f"This worktree may have been created before.", file=sys.stderr)
+            print(f"WARNING: TODO file already exists: {todo_filename}\nThis worktree may have been created before.", file=sys.stderr)
 
         # Copy template and customize
         template_path = repo_root / ".claude" / "skills" / "workflow-orchestrator" / "templates" / "TODO_template.md"
@@ -228,7 +228,6 @@ Examples:
     parser.add_argument("slug", help="Short descriptive name (e.g., my-feature, v1.6.0)")
     parser.add_argument("base_branch", help="Branch to create from (e.g., contrib/username, develop)")
     parser.add_argument("--create-todo", action="store_true", default=False, help="Create TODO file (deprecated, defaults to False)")
-    parser.add_argument("--no-todo", action="store_true", default=True, help="Skip TODO file creation (default, for backward compatibility)")
 
     args = parser.parse_args()
 
