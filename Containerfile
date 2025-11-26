@@ -14,11 +14,9 @@ FROM python:3.11-slim-bookworm AS builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PYTHONUNBUFFERED=1
 
-# Install build dependencies
+# Install build dependencies and uv
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gcc \
@@ -26,16 +24,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     libsndfile1 \
     ffmpeg \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# Install uv
+ENV UV_INSTALL_DIR="/usr/local/bin"
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install Python dependencies
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --upgrade pip && \
-    pip install -r /tmp/requirements.txt
+# Create virtual environment with uv
+RUN uv venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH" \
+    VIRTUAL_ENV="/opt/venv"
+
+# Install Python dependencies with uv
+COPY pyproject.toml uv.lock* /tmp/
+WORKDIR /tmp
+RUN uv sync --frozen 2>/dev/null || uv sync
 
 # Pre-download models to cache (optional - makes first run faster)
 # Note: HuggingFace models will be cached in /root/.cache/huggingface
