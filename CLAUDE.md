@@ -52,14 +52,14 @@ This repository uses a **skill-based workflow system** (v5.3) located in `.claud
 
 | Command | Purpose |
 |---------|---------|
-| `/workflow/all` | Orchestrate full workflow with auto-detection |
-| `/1_specify` | Create feature branch and specification |
-| `/2_plan` | Generate detailed specs via speckit-author |
-| `/3_tasks` | Validate task list from plan.md |
-| `/4_implement` | Execute tasks + run quality gates |
-| `/5_integrate` | Create PRs, cleanup worktree |
-| `/6_release` | Create release (develop→main) |
-| `/7_backmerge` | Sync release to develop and contrib |
+| `/workflow:all` | Orchestrate full workflow with auto-detection |
+| `/workflow:1_specify` | Create feature branch and specification |
+| `/workflow:2_plan` | Generate detailed specs via speckit-author |
+| `/workflow:3_tasks` | Validate task list from plan.md |
+| `/workflow:4_implement` | Execute tasks + run quality gates |
+| `/workflow:5_integrate` | Create PRs, cleanup worktree |
+| `/workflow:6_release` | Create release (develop→main) |
+| `/workflow:7_backmerge` | Sync release to develop and contrib |
 
 ### Branch Structure
 
@@ -77,7 +77,7 @@ podman-compose run --rm dev uv run python .claude/skills/quality-enforcer/script
 
 | Gate | Description |
 |------|-------------|
-| 1. Coverage | ≥40% test coverage (target: 80%, tracked in issue #9) |
+| 1. Coverage | ≥40% test coverage on `src/` (target: 80%, tracked in issue #9) |
 | 2. Tests | All pytest tests pass |
 | 3. Build | Build succeeds |
 | 4. Linting | `ruff check .` clean |
@@ -140,6 +140,8 @@ uv run pre-commit run --all-files
 | initialize-repository | Bootstrap new repos |
 
 ### AgentDB (Workflow State)
+
+> **Note**: AgentDB requires DuckDB which may not be available in all container environments. These commands are optional for workflow state tracking.
 
 ```bash
 # Initialize database (start of session)
