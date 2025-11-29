@@ -1,8 +1,9 @@
 # Epics: Apply Templates Workflow
 
 **Feature**: Apply workflow templates from stharrold-templates to media-intelligence
-**GitHub Issue**: #11
+**GitHub Issue**: #11 (closed - specifications complete)
 **Date**: 2025-11-28
+**Status**: Planning/Specifications complete, implementation pending
 
 ## Epic 1: Documentation Templates
 

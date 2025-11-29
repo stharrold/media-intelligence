@@ -11,9 +11,9 @@ Apply the skill-based progressive disclosure workflow system (v5.3) from `stharr
 
 ## Implementation Context
 
-<!-- Generated from workflow-migration-plan.md -->
+<!-- Generated from planning/apply-templates-workflow/ -->
 
-**Planning Reference:** See `planning/workflow-migration-plan.md` for complete migration details.
+**Planning Reference:** See `planning/apply-templates-workflow/` for complete planning documents (requirements.md, architecture.md, epics.md).
 
 **Migration Approach:** Manual selective copy (most control for existing repo with content)
 
@@ -25,7 +25,7 @@ Apply the skill-based progressive disclosure workflow system (v5.3) from `stharr
 
 ## Requirements Reference
 
-See: `planning/workflow-migration-plan.md` - Phases 0-7
+See: `planning/apply-templates-workflow/requirements.md` for functional requirements
 
 ### What Already Exists (Pre-Migration State)
 
@@ -158,7 +158,6 @@ Validate the workflow system works:
 
 ## References
 
-- `planning/workflow-migration-plan.md` - Complete migration plan
-- `WORKFLOW.md` - Workflow system documentation
-- `ARCHITECTURE.md` - System architecture
-- `CONTRIBUTING.md` - Contribution guidelines
+- `planning/apply-templates-workflow/` - Planning documents (requirements, architecture, epics)
+- `.claude/skills/` - 9 workflow skills
+- `CLAUDE.md` - Project context and workflow overview
