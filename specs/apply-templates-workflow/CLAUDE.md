@@ -1,3 +1,9 @@
+---
+type: claude-context
+directory: specs/apply-templates-workflow
+purpose: SpecKit specifications for apply-templates-workflow feature
+---
+
 # Claude Code Context: specs/apply-templates-workflow
 
 ## Purpose
