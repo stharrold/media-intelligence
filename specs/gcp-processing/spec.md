@@ -316,10 +316,11 @@ End-to-end test with mocked GCP services to validate:
 
 ## Quality Gates
 
-- [ ] Test coverage ≥ 40% (project minimum)
+- [ ] Test coverage ≥ 40% overall (project minimum), ≥80% for new GCP modules
 - [ ] All tests passing
 - [ ] Linting clean (ruff check)
 - [ ] AI Config synced (CLAUDE.md → AGENTS.md)
+- [ ] Build succeeds (Containerfile.gcp)
 
 ## Container Specifications
 
@@ -333,7 +334,7 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --extra gcp
 
 COPY src/ src/
 
@@ -342,10 +343,21 @@ EXPOSE 8080
 ENV PORT=8080
 
 HEALTHCHECK --interval=30s --timeout=3s \
-  CMD python -c "import requests; requests.get('http://localhost:8080/health')"
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"
 
 CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080"]
 ```
+
+### Cloud Run Configuration
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| Memory | 2 GiB | Audio processing buffer for large files |
+| CPU | 2 | Multi-core for parallel API calls |
+| Timeout | 300s | Accommodate audio files up to 30 min |
+| Concurrency | 80 | Default, tune based on load testing |
+| Min instances | 0 | Cost optimization |
+| Max instances | 100 | Budget constraint |
 
 ## Dependencies
 
@@ -378,11 +390,62 @@ gcp = [
 - Log detailed errors with request context
 - Return structured error responses from Cloud Run
 
+### Dead Letter Queue
+
+For failed processing, configure Pub/Sub dead letter topic:
+- Create dead letter topic: `{project}-audio-dlq`
+- Set max delivery attempts: 3
+- Retain failed messages for 7 days
+- Monitor DLQ depth with Cloud Monitoring alert
+
+### Logging
+
+Use structured JSON logging compatible with Cloud Logging:
+
+```python
+import logging
+import json
+
+class StructuredLogFormatter(logging.Formatter):
+    def format(self, record):
+        return json.dumps({
+            "severity": record.levelname,
+            "message": record.getMessage(),
+            "timestamp": self.formatTime(record),
+            "audio_uri": getattr(record, "audio_uri", None),
+            "processing_stage": getattr(record, "processing_stage", None),
+        })
+```
+
+### Alerting
+
+Configure Cloud Monitoring alert policies:
+- Error rate > 5% over 5 minutes → PagerDuty/Slack
+- Latency p95 > 60 seconds → Warning notification
+- DLQ depth > 10 messages → Critical alert
+
 ### Security
 
 - Use Workload Identity for GCP authentication (no service account keys)
 - Input validation on all API endpoints
 - Sanitize file paths to prevent path traversal
+- IAM roles: storage.objectViewer, storage.objectCreator, speech.client, aiplatform.user
+
+## Current State
+
+The repository already contains GCP-related files in `src/`:
+- `src/main.py` - Cloud Run/Functions entry points
+- `src/audio_processor.py` - GCP orchestrator
+- `src/speech_client.py` - Cloud Speech-to-Text V2
+- `src/situation_classifier.py` - Vertex AI AutoML
+- `src/storage_manager.py` - GCS operations
+- `src/gcp_utils.py` - GCP-specific utilities
+
+This specification focuses on:
+1. Completing implementation of existing stubs
+2. Adding comprehensive tests
+3. Ensuring quality gate compliance
+4. Container optimization for Cloud Run
 
 ## References
 

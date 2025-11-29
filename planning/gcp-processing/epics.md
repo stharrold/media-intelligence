@@ -1,4 +1,4 @@
-# Epic Breakdown: Gcp Processing
+# Epic Breakdown: GCP Processing
 
 **Date:** 2025-11-29
 **Author:** stharrold
@@ -6,7 +6,7 @@
 
 ## Overview
 
-This document breaks down the Gcp Processing feature into implementable epics with clear scope, dependencies, and priorities.
+This document breaks down the GCP Processing feature into implementable epics with clear scope, dependencies, and priorities.
 
 **References:**
 - [Requirements](requirements.md) - Business requirements and acceptance criteria
@@ -16,257 +16,222 @@ This document breaks down the Gcp Processing feature into implementable epics wi
 
 | Epic ID | Name | Complexity | Priority | Dependencies | Estimated Effort |
 |---------|------|------------|----------|--------------|------------------|
-| E-001 | Core Business Logic | High | P0 | None | 5-7.5 days |
+| E-001 | Core Business Logic | High | P0 | None | 5-7 days |
 | E-002 | API Layer | Medium | P0 | E-001 | 2-3 days |
-| E-003 | Testing & Quality Assurance | Medium | P1 | E-002 | 1-2 days |
-| E-004 | Containerization & Deployment | Low | P2 | E-001 | 1 day |
+| E-003 | Testing & Quality Assurance | Medium | P1 | E-002 | 2-3 days |
+| E-004 | Containerization & Deployment | Low | P2 | E-001 | 1-2 days |
 
-**Total Estimated Effort:** 9+ days
+**Total Estimated Effort:** 10-15 days
 
 ## Epic Definitions
-
 
 ### E-001: Core Business Logic
 
 **Description:**
-Implement core functionality and business rules
+Implement the GCP audio processing pipeline components: storage management, speech transcription, audio classification, and orchestration.
 
 **Scope:**
+- GCS operations (download/upload)
+- Cloud Speech-to-Text V2 client with diarization
+- Vertex AI classification client
+- Pipeline orchestrator with retry logic
+
 **Deliverables:**
-  - [ ] Implementation of FR-001
-  - [ ] Implementation of FR-002
-  - [ ] Implementation of FR-003
-  - [ ] Implementation of FR-004
-  - [ ] Implementation of FR-005
-  - [ ] Unit tests for business logic
-  - [ ] Integration tests
+- [ ] `src/storage_manager.py` - GCS operations with context managers
+- [ ] `src/speech_client.py` - Speech-to-Text V2 wrapper
+- [ ] `src/situation_classifier.py` - Vertex AI classification
+- [ ] `src/audio_processor.py` - Pipeline orchestrator
+- [ ] Unit tests for each component (mocked GCP clients)
 
 **Complexity:** High
 
 **Complexity Reasoning:**
-Implements 5 functional requirements with business logic
+Implements 5 functional requirements (FR-001 through FR-005) with GCP API integration, retry logic, and data transformation. Requires understanding of GCP client libraries and error handling patterns.
 
 **Priority:** P0
 
 **Priority Reasoning:**
-Core functionality - primary value delivery
+Core functionality - all other epics depend on this foundation being complete.
 
 **Dependencies:** None
 
-**Estimated Effort:** 5-7.5 days
-
+**Estimated Effort:** 5-7 days
 
 ### E-002: API Layer
 
 **Description:**
-Implement FastAPI API endpoints and request/response handling
+Implement FastAPI Cloud Run entry point with request/response handling, health checks, and input validation.
 
 **Scope:**
+- FastAPI application structure
+- POST /process endpoint for GCS triggers
+- GET /health endpoint for Cloud Run
+- Pydantic models for validation
+
 **Deliverables:**
-  - [ ] REST API endpoints
-  - [ ] Request validation
-  - [ ] Response serialization
-  - [ ] API documentation (OpenAPI)
-  - [ ] API integration tests
+- [ ] `src/main.py` - FastAPI application with endpoints
+- [ ] Request validation (file format, size)
+- [ ] Response serialization (ProcessResponse)
+- [ ] OpenAPI documentation (auto-generated)
+- [ ] API integration tests
 
 **Complexity:** Medium
 
 **Complexity Reasoning:**
-FastAPI API development is straightforward but requires careful contract design
+FastAPI development is straightforward, but requires careful integration with E-001 components and proper error response formatting for Cloud Run.
 
 **Priority:** P0
 
 **Priority Reasoning:**
-Required for external system integration
+Required for Cloud Run deployment - the entry point for all processing requests.
 
 **Dependencies:** E-001
 
 **Estimated Effort:** 2-3 days
 
-
 ### E-003: Testing & Quality Assurance
 
 **Description:**
-Comprehensive testing coverage and quality gates
+Comprehensive test coverage and quality gate compliance for all GCP modules.
 
 **Scope:**
+- Unit tests with mocked GCP clients
+- Integration tests for full pipeline flow
+- Quality gate verification
+
 **Deliverables:**
-  - [ ] Test coverage ≥80%
-  - [ ] All tests passing
-  - [ ] Linting clean (ruff)
-  - [ ] Type checking clean (mypy)
-  - [ ] Documentation complete
+- [ ] `tests/test_storage_manager.py`
+- [ ] `tests/test_speech_client.py`
+- [ ] `tests/test_situation_classifier.py`
+- [ ] `tests/test_audio_processor.py`
+- [ ] `tests/test_gcp_integration.py`
+- [ ] Test coverage ≥80% for new GCP modules
+- [ ] All tests passing
+- [ ] Linting clean (ruff check)
 
 **Complexity:** Medium
 
 **Complexity Reasoning:**
-Testing requires thorough coverage but is well-structured with pytest
+Requires comprehensive mocking of GCP clients and testing various error scenarios. pytest-mock patterns are well-established in the codebase.
 
 **Priority:** P1
 
 **Priority Reasoning:**
-Critical for production readiness but can overlap with implementation
+Critical for production readiness. Can be developed in parallel with E-002 for efficiency.
 
 **Dependencies:** E-002
 
-**Estimated Effort:** 1-2 days
-
+**Estimated Effort:** 2-3 days
 
 ### E-004: Containerization & Deployment
 
 **Description:**
-Container setup and deployment configuration
+GCP-optimized container configuration and deployment setup.
 
 **Scope:**
+- Cloud Run optimized Containerfile
+- Container build and validation
+- Deployment configuration documentation
+
 **Deliverables:**
-  - [ ] Containerfile
-  - [ ] podman-compose.yml (if multi-container)
-  - [ ] Container build successful
-  - [ ] Container tests passing
+- [ ] `Containerfile.gcp` - Cloud Run optimized container
+- [ ] Container build successful locally
+- [ ] Container tests passing
+- [ ] Cloud Run configuration documented (memory, CPU, timeout)
 
 **Complexity:** Low
 
 **Complexity Reasoning:**
-Standard Podman containerization with existing patterns
+Standard Podman containerization with existing patterns. Cloud Run configuration is well-documented.
 
 **Priority:** P2
 
 **Priority Reasoning:**
-Important for production but not blocking development
+Important for deployment but not blocking core development. Can be done in parallel with E-003.
 
 **Dependencies:** E-001
 
-**Estimated Effort:** 1 day
-
+**Estimated Effort:** 1-2 days
 
 ## Implementation Plan
 
-### Phase 1: Foundation (P0 Epics)
+### Phase 1: Core Pipeline (E-001)
 
-**Epics:** E-001
-
-**Goal:** [What this phase achieves]
+**Goal:** Implement all GCP service integrations and pipeline orchestration
 
 **Deliverables:**
-- [Key deliverable 1]
-- [Key deliverable 2]
+- Storage manager with GCS operations
+- Speech client with transcription and diarization
+- Situation classifier with Vertex AI
+- Audio processor orchestrating the pipeline
 
 **Success Criteria:**
-- [ ] [Criterion 1]
-- [ ] [Criterion 2]
+- [ ] All components implemented with lazy initialization
+- [ ] Unit tests passing with mocked GCP clients
+- [ ] Retry logic working for transient errors
 
----
+### Phase 2: API & Testing (E-002, E-003)
 
-### Phase 2: Core Features (P1 Epics)
-
-**Epics:** E-002, E-003
-
-**Goal:** [What this phase achieves]
+**Goal:** Complete API layer and achieve test coverage targets
 
 **Deliverables:**
-- [Key deliverable 1]
-- [Key deliverable 2]
+- FastAPI application with all endpoints
+- Comprehensive test suite
+- Quality gates passing
 
 **Success Criteria:**
-- [ ] [Criterion 1]
-- [ ] [Criterion 2]
+- [ ] API endpoints responding correctly
+- [ ] Test coverage ≥80% for GCP modules
+- [ ] Integration tests validating full flow
 
----
+### Phase 3: Containerization (E-004)
 
-### Phase 3: Enhancements (P2 Epics)
-
-**Epics:** [P2 epic IDs]
-
-**Goal:** [What this phase achieves]
+**Goal:** Production-ready container for Cloud Run
 
 **Deliverables:**
-- [Enhancement 1]
-- [Enhancement 2]
+- Optimized Containerfile
+- Validated container build
 
 **Success Criteria:**
-- [ ] [Criterion 1]
-- [ ] [Criterion 2]
-
----
+- [ ] Container builds successfully
+- [ ] Health check responding
+- [ ] Container size optimized
 
 ## Dependency Graph
 
 ```
-E-001 (Foundation)
-  ↓
-  ├─→ E-002 (Feature A) ─→ E-005 (Integration)
-  │                            ↓
-  └─→ E-003 (Feature B) ───────┘
-       ↓
-       └─→ E-004 (Enhancement)
+E-001 (Core Business Logic)
+  │
+  ├─→ E-002 (API Layer)
+  │         │
+  │         └─→ E-003 (Testing & QA)
+  │
+  └─→ E-004 (Containerization)
 ```
 
-**Critical Path:** E-001 → E-002 → E-005
+**Critical Path:** E-001 → E-002 → E-003
 
-**Parallel Work:** E-003 can be developed in parallel with E-002
-
----
-
-## Timeline
-
-| Week | Epics | Focus |
-|------|-------|-------|
-| Week 1 | E-001 | Foundation setup |
-| Week 2 | E-002 | Core feature A |
-| Week 3 | E-003 | Core feature B |
-| Week 4 | E-002, E-003 | Testing and refinement |
-| Week 5 | E-005 | Integration |
-
-**Milestone Dates:**
-- **M1:** Week 1 - Foundation complete
-- **M2:** Week 3 - Core features complete
-- **M3:** Week 5 - Integration ready
-
----
-
-## Resource Requirements
-
-### Development
-- Backend developer: [X weeks]
-- Frontend developer: [X weeks] (if applicable)
-- DevOps: [X days] (for containers, deployment)
-
-### Testing
-- QA testing: [X days]
-- Performance testing: [X days]
-- Security review: [X days]
-
-### Infrastructure
-- Development database: SQLite (local)
-- Staging database: PostgreSQL
-- Containers: Podman + podman-compose
-
----
-
-## Open Questions
-
-- [ ] Question 1: [Decision needed before starting epic]
-- [ ] Question 2: [Clarification required]
-- [ ] Question 3: [Technical choice to make]
-
----
+**Parallel Work:**
+- E-003 and E-004 can be developed in parallel after E-002 starts
+- Unit tests in E-003 can begin as E-001 components are completed
 
 ## Success Metrics
 
 **Epic Completion:**
 - [ ] All epic acceptance criteria met
-- [ ] Test coverage ≥ 80% for each epic
+- [ ] Test coverage ≥40% overall (project minimum)
+- [ ] Test coverage ≥80% for new GCP modules
 - [ ] No P0 or P1 bugs in epic scope
 - [ ] Code review approved
 
 **Feature Completion:**
 - [ ] All epics delivered
-- [ ] End-to-end testing passed
-- [ ] Performance benchmarks met
+- [ ] End-to-end pipeline functional
+- [ ] Quality gates passing (5 gates)
 - [ ] Documentation complete
-
----
 
 ## Notes
 
-[Add any additional context, decisions, or considerations here]
+- **Test coverage clarification:** Project minimum is 40%, but new GCP modules target 80% to ensure reliability of cloud integrations
+- **Existing code:** Some GCP files may already exist in src/ (check git history). This epic focuses on completing and testing the implementation
+- **Terraform:** Infrastructure changes are out of scope; uses existing terraform/ modules

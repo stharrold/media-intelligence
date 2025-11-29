@@ -1,4 +1,4 @@
-# Requirements: Gcp Processing
+# Requirements: GCP Processing
 
 **Date:** 2025-11-29
 **Author:** stharrold
@@ -12,15 +12,19 @@ The local audio processing pipeline is limited to single-machine CPU processing.
 
 ### Success Criteria
 
-- [ ] Process audio files via Cloud Storage triggers; transcription accuracy matches local Whisper model; speaker diarization integrated; AudioSet classification via Vertex AI; processing latency under 2x audio duration; 99.9% availability
+- [ ] Process audio files via Cloud Storage triggers
+- [ ] Transcription accuracy matches or exceeds local Whisper model
+- [ ] Speaker diarization integrated with transcription output
+- [ ] AudioSet classification via Vertex AI
+- [ ] Processing latency under 2x audio duration for files under 30 minutes
+- [ ] 99.9% availability for the processing pipeline
 
 ### Stakeholders
 
 - **Primary:** Operations teams processing large audio archives, analysts requiring near-real-time transcription and classification, enterprise customers with existing GCP infrastructure
-- **Secondary:** [Who else is impacted? Other teams, systems, users?]
+- **Secondary:** DevOps teams managing cloud infrastructure, security teams reviewing data handling
 
 ## Functional Requirements
-
 
 ### FR-001: Cloud Storage Audio Ingestion
 
@@ -33,7 +37,6 @@ The local audio processing pipeline is limited to single-machine CPU processing.
 - [ ] Support for WAV, MP3, FLAC, OGG audio formats
 - [ ] Validate file format and size before processing
 
-
 ### FR-002: Cloud Speech-to-Text Transcription
 
 **Priority:** High
@@ -44,7 +47,6 @@ The local audio processing pipeline is limited to single-machine CPU processing.
 - [ ] Enable speaker diarization in transcription config
 - [ ] Support multiple languages (configurable)
 - [ ] Return timestamped transcript segments
-
 
 ### FR-003: Vertex AI Audio Classification
 
@@ -57,7 +59,6 @@ The local audio processing pipeline is limited to single-machine CPU processing.
 - [ ] Support batch inference for efficiency
 - [ ] Handle model versioning and updates
 
-
 ### FR-004: Structured Output Generation
 
 **Priority:** High
@@ -68,7 +69,6 @@ The local audio processing pipeline is limited to single-machine CPU processing.
 - [ ] Include transcript segments with speaker IDs and timestamps
 - [ ] Include situation/classification segments with labels
 - [ ] Store results in GCS output bucket
-
 
 ### FR-005: Error Handling and Retry
 
@@ -81,38 +81,41 @@ The local audio processing pipeline is limited to single-machine CPU processing.
 - [ ] Structured logging for debugging
 - [ ] Alert on repeated failures
 
-
 ## Non-Functional Requirements
 
 ### Performance
 
-- Performance: Processing latency < 2x audio duration for files under 30 minutes; throughput 100+ concurrent files; API response time < 500ms
-- Concurrency: [e.g., 100 simultaneous users]
+- Processing latency: < 2x audio duration for files under 30 minutes
+- Throughput: 100+ concurrent audio files
+- API response time: < 500ms for health checks
+- Cold start: < 10 seconds for Cloud Run instances
 
 ### Security
 
-- Authentication: [e.g., JWT tokens, OAuth 2.0]
-- Authorization: [e.g., Role-based access control]
-- Data encryption: [e.g., At rest and in transit]
-- Input validation: [e.g., JSON schema validation]
+- **Authentication:** Workload Identity for GCP service-to-service auth (no service account keys)
+- **Authorization:** IAM roles for service account (storage.objectViewer, storage.objectCreator, speech.client, aiplatform.user)
+- **Data encryption:** At rest (GCS default encryption) and in transit (TLS 1.3)
+- **Input validation:** File extension whitelist, size limits (< 1 GB), path traversal prevention
+- **Audit logging:** Cloud Audit Logs enabled for all GCP API calls
 
 ### Scalability
 
-- Horizontal scaling: [Yes/No, explain approach]
-- Database sharding: [Required? Strategy?]
-- Cache strategy: [e.g., Redis for session data]
+- Horizontal scaling: Yes, Cloud Run auto-scales 0-100 instances
+- Stateless design: No shared state between requests
+- Event-driven: Pub/Sub decouples ingestion from processing
 
 ### Reliability
 
-- Uptime target: [e.g., 99.9%]
-- Error handling: [Strategy for failures]
-- Data backup: [Frequency, retention]
+- Uptime target: 99.9% availability
+- Error handling: Retry transient failures (3 attempts, exponential backoff)
+- Dead letter queue: Failed messages retained for 7 days for investigation
+- Data durability: GCS provides 99.999999999% durability
 
 ### Maintainability
 
-- Code coverage: [e.g., ≥80%]
-- Documentation: [API docs, architecture docs]
-- Testing: [Unit, integration, e2e strategies]
+- Code coverage: ≥40% overall (project minimum), ≥80% for new GCP modules
+- Documentation: API docs via OpenAPI, architecture docs in planning/
+- Testing: Unit tests (mocked GCP), integration tests, manual GCP validation
 
 ## Constraints
 
@@ -120,85 +123,116 @@ The local audio processing pipeline is limited to single-machine CPU processing.
 
 - Programming language: Python 3.11+
 - Package manager: uv
-- Framework: [e.g., FastAPI, Flask, Django]
-- Database: [e.g., SQLite, PostgreSQL]
-- Container: Podman
+- Framework: FastAPI for Cloud Run entry point
+- Database: None (stateless pipeline)
+- Container: Podman (local), Cloud Run (production)
 
 ### Budget
 
-[Any cost constraints or considerations]
+- Speech-to-Text V2: ~$0.024/minute (standard model)
+- Vertex AI Prediction: ~$0.10/1000 predictions
+- Cloud Run: ~$0.00002400/vCPU-second
+- Cloud Storage: ~$0.02/GB/month
+- **Monthly estimate:** $500-2000 for 10,000 audio files/day (avg 5 min each)
 
 ### Timeline
 
-- Target completion: [Date or duration]
-- Milestones: [Key dates]
+- Target completion: Implementation ready for review
+- Milestones: Core pipeline → Testing → Container → Deployment
 
 ### Dependencies
 
-- External systems: [APIs, services this depends on]
-- Internal systems: [Other features, modules]
-- Third-party libraries: [Key dependencies]
+- External systems: GCP Speech-to-Text V2, Vertex AI, Cloud Storage, Cloud Run
+- Internal systems: Shared data models from src/utils.py (TranscriptSegment, ProcessingResult)
+- Third-party libraries: google-cloud-storage, google-cloud-speech, google-cloud-aiplatform, tenacity, fastapi
 
 ## Out of Scope
 
-[Explicitly state what this feature will NOT include. This prevents scope creep.]
+Explicitly excluded from this feature:
 
-- [Feature or capability NOT in scope]
-- [Future enhancement to consider later]
-- [Related but separate concern]
+- **Real-time streaming:** Only batch processing of complete audio files
+- **Video processing:** Audio extraction from video is not supported
+- **Custom model training:** Uses pre-trained or pre-deployed models only
+- **Multi-region deployment:** Single region deployment initially
+- **User-facing UI:** API-only, no web interface
+- **Terraform infrastructure:** Uses existing terraform/ modules, no new IaC
 
 ## Risks and Mitigation
 
 | Risk | Probability | Impact | Mitigation Strategy |
 |------|------------|--------|---------------------|
-| [Risk description] | High/Med/Low | High/Med/Low | [How to prevent or handle] |
-| [Risk description] | High/Med/Low | High/Med/Low | [How to prevent or handle] |
+| GCP API quota limits exceeded | Medium | High | Request quota increase, implement rate limiting |
+| Speech-to-Text accuracy lower than Whisper | Low | Medium | Benchmark before deployment, fallback to local pipeline |
+| Vertex AI cold start latency | Medium | Low | Keep minimum instances, batch predictions |
+| Cost overruns from unexpected usage | Medium | High | Set budget alerts, max instance limits, monitoring |
+| Audio format compatibility issues | Low | Low | Validate formats upfront, clear error messages |
 
 ## Data Requirements
 
 ### Data Entities
 
-[Describe the main data entities this feature will work with]
+- **Input:** Audio files (WAV, MP3, FLAC, OGG) up to 1 GB
+- **Output:** ProcessingResult JSON with transcript and classification
+- **Intermediate:** Temporary files during processing (auto-cleaned)
 
 ### Data Volume
 
-[Expected data size, growth rate]
+- Expected: 10,000+ audio files per day
+- Average file size: 10-50 MB
+- Average duration: 5-30 minutes
 
 ### Data Retention
 
-[How long to keep data, archive strategy]
+- Input files: Retained in input bucket (user-managed)
+- Output files: Retained in output bucket indefinitely
+- Logs: 30 days in Cloud Logging
+- Failed messages: 7 days in dead letter queue
 
 ## User Stories
 
-### As a [user type], I want [goal] so that [benefit]
+### As an operations analyst, I want to process audio files by uploading them to GCS so that I can get transcriptions without managing infrastructure
 
-**Scenario 1:** [Happy path]
-- Given [context]
-- When [action]
-- Then [expected result]
+**Scenario 1:** Successful processing
+- Given an audio file is uploaded to the input bucket
+- When the processing pipeline completes
+- Then a JSON result file appears in the output bucket with transcription and classification
 
-**Scenario 2:** [Alternative path]
-- Given [context]
-- When [action]
-- Then [expected result]
+**Scenario 2:** Unsupported format
+- Given a file with unsupported extension (e.g., .xyz) is uploaded
+- When the pipeline receives the event
+- Then the request is rejected with a clear error message and no processing occurs
 
-**Scenario 3:** [Error condition]
-- Given [context]
-- When [action]
-- Then [expected error handling]
+**Scenario 3:** Transient API failure
+- Given a Speech-to-Text API call fails with a 503 error
+- When the retry logic is triggered
+- Then the request is retried up to 3 times with exponential backoff before failing to DLQ
+
+### As a DevOps engineer, I want to monitor pipeline health so that I can respond to issues quickly
+
+**Scenario 1:** Health check
+- Given the Cloud Run service is deployed
+- When I call GET /health
+- Then I receive a 200 response with status "healthy"
+
+**Scenario 2:** Error alerting
+- Given the error rate exceeds 5% over 5 minutes
+- When Cloud Monitoring evaluates the alert policy
+- Then a notification is sent to the on-call channel
 
 ## Assumptions
 
-[List any assumptions being made about users, systems, or environment]
-
-- Assumption 1: [e.g., Users have modern browsers]
-- Assumption 2: [e.g., Network connectivity is reliable]
-- Assumption 3: [e.g., Input data follows expected format]
+- GCP project exists with billing enabled
+- Service account with appropriate IAM roles is configured
+- Network connectivity to GCP APIs is available
+- Audio files uploaded to input bucket are valid and not corrupted
+- Vertex AI endpoint for AudioSet classification is pre-deployed
 
 ## Questions and Open Issues
 
-- [ ] Question 1: [Unresolved question requiring input]
-- [ ] Question 2: [Decision needed before implementation]
+- [x] Speech-to-Text V1 vs V2? → V2 for better accuracy and native diarization
+- [x] Cloud Functions vs Cloud Run? → Cloud Run for longer timeouts and container flexibility
+- [ ] Vertex AI model: use pre-trained or fine-tune on domain data?
+- [ ] Multi-language support: which languages to enable by default?
 
 ## Approval
 
