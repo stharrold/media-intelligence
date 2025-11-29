@@ -1,3 +1,9 @@
+---
+type: claude-context
+directory: specs/apply-templates-workflow
+purpose: SpecKit specifications for apply-templates-workflow feature
+---
+
 # Claude Code Context: specs/apply-templates-workflow
 
 ## Purpose
@@ -26,9 +32,9 @@ When implementing this feature:
 1. Read spec.md for technical details
 2. Follow plan.md task order
 3. Run quality gates before PR
-4. Refer to planning/workflow-migration-plan.md for full context
+4. Refer to planning/apply-templates-workflow/ for context (requirements.md, architecture.md, epics.md)
 
 ## Related Documentation
 
 - **[README.md](README.md)** - Human-readable documentation for this directory
-- **[../../planning/workflow-migration-plan.md](../../planning/workflow-migration-plan.md)** - Complete migration plan
+- **[../../planning/apply-templates-workflow/](../../planning/apply-templates-workflow/)** - Planning documents (requirements, architecture, epics)

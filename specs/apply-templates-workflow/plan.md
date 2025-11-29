@@ -88,15 +88,15 @@ Create the specification documents for this feature (self-referential - this tas
 
 **Steps:**
 1. Create `specs/apply-templates-workflow/` directory
-2. Generate spec.md from planning/workflow-migration-plan.md
+2. Generate spec.md from planning/apply-templates-workflow/
 3. Generate plan.md with task breakdown
 4. Create CLAUDE.md and README.md
 
 **Acceptance Criteria:**
-- [ ] spec.md exists with complete specification
-- [ ] plan.md exists with task breakdown
-- [ ] CLAUDE.md provides AI context
-- [ ] README.md provides human-readable overview
+- [x] spec.md exists with complete specification
+- [x] plan.md exists with task breakdown
+- [x] CLAUDE.md provides AI context
+- [x] README.md provides human-readable overview
 
 **Verification:**
 ```bash
@@ -124,14 +124,14 @@ Record the /2_plan phase transition in AgentDB.
 3. Query state to confirm
 
 **Acceptance Criteria:**
-- [ ] Workflow transition recorded
-- [ ] State query shows phase_2_plan
+- [x] Workflow transition recorded
+- [x] State query shows phase_2_plan
 
 **Verification:**
 ```bash
 podman-compose run --rm dev uv run python .claude/skills/agentdb-state-manager/scripts/record_sync.py \
   --sync-type workflow_transition --pattern phase_2_plan \
-  --source "planning/workflow-migration-plan.md" --target "specs/apply-templates-workflow"
+  --source "planning/apply-templates-workflow" --target "specs/apply-templates-workflow"
 podman-compose run --rm dev uv run python .claude/skills/agentdb-state-manager/scripts/query_workflow_state.py --format json
 ```
 
@@ -159,8 +159,8 @@ Commit the specification files to the feature branch.
 3. Verify commit
 
 **Acceptance Criteria:**
-- [ ] All spec files committed
-- [ ] Commit message follows convention
+- [x] All spec files committed
+- [x] Commit message follows convention
 
 **Verification:**
 ```bash
@@ -199,11 +199,11 @@ impl_002 (init db) ───────┴─> impl_004 (record state) ─┘
 
 Before considering this phase complete:
 
-- [ ] All tasks marked as complete
-- [ ] Quality gates pass
-- [ ] AgentDB initialized and recording
-- [ ] Specifications created and committed
-- [ ] Ready to proceed to /3_tasks
+- [x] All tasks marked as complete
+- [x] Quality gates pass (44% coverage, tests pass, build ok, lint ok, sync ok)
+- [x] AgentDB initialized and recording
+- [x] Specifications created and committed
+- [x] Ready to proceed to /3_tasks
 
 ## Next Steps After Plan Completion
 
@@ -228,6 +228,6 @@ Before considering this phase complete:
 
 ### Resources
 
-- `planning/workflow-migration-plan.md` - Complete migration plan
-- `WORKFLOW.md` - Workflow system documentation
+- `planning/apply-templates-workflow/` - Planning documents (requirements, architecture, epics)
 - `.claude/skills/*/CLAUDE.md` - Skill-specific context
+- `CLAUDE.md` - Project context and workflow overview
